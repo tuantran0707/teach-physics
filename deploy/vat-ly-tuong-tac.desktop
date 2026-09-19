@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Vật lý tương tác
+Comment=Thiết bị học Vật lý trên Raspberry Pi
+Exec=/usr/bin/npm start --prefix /home/pi/teach-physics
+Path=/home/pi/teach-physics
+Terminal=false
+X-GNOME-Autostart-enabled=true
