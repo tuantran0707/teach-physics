@@ -1,0 +1,10 @@
+#pragma once
+
+#define WIFI_SSID "your-wifi-name"
+#define WIFI_PASSWORD "your-wifi-password"
+
+#define LINE_SENSOR_PIN 34
+#define LINE_SENSOR_ANALOG 1
+#define LINE_SENSOR_THRESHOLD 1800
+#define LINE_BLACK_BELOW_THRESHOLD 1
+#define LINE_DIGITAL_BLACK_LOW 1
