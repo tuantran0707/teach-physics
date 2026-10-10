@@ -225,16 +225,18 @@
             cell.classList.add('fruit-cell');
             cell.dataset.fruit = fruit.instance;
             cell.dataset.fruitType = fruit.type;
-            cell.innerHTML = `<span class="map-object fruit-object">${fruit.icon}</span><small>${fruit.name}</small>`;
+            cell.setAttribute('aria-label', `Trái cây: ${fruit.name}`);
+            cell.innerHTML = `<span class="map-object fruit-object">${fruit.icon}</span>`;
           } else if (hazard) {
             cell.classList.add('hazard-cell', hazard.type);
             cell.dataset.hazard = hazard.type;
+            cell.setAttribute('aria-label', `Chướng ngại vật: ${hazard.name}`);
             const hazardArt = hazard.type === 'mud'
               ? '<span class="map-object hazard-object mud-art"><i></i><i></i><i></i></span>'
               : hazard.type === 'hole'
                 ? '<span class="map-object hazard-object hole-art"></span>'
                 : `<span class="map-object hazard-object thorn-art">${hazard.icon}</span>`;
-            cell.innerHTML = `<b class="hazard-warning">!</b>${hazardArt}<small>${hazard.name}</small>`;
+            cell.innerHTML = `<b class="hazard-warning">!</b>${hazardArt}`;
           } else if ((x === 2 && y === 4) || (x === 2 && y === 5)) {
             cell.classList.add('cave-cell');
             cell.innerHTML = '<span class="map-object">🪵</span><small>HANG SÓC</small>';

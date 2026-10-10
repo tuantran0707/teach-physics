@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 240" role="img" aria-labelledby="title">
+  <title id="title">Khỉ Vàng</title>
+  <defs>
+    <linearGradient id="fur" x2="0" y2="1"><stop stop-color="#ffd76b"/><stop offset="1" stop-color="#e99b30"/></linearGradient>
+    <linearGradient id="shirt" x2="0" y2="1"><stop stop-color="#ef7658"/><stop offset="1" stop-color="#c94741"/></linearGradient>
+  </defs>
+  <ellipse cx="111" cy="225" rx="58" ry="9" fill="#204a3a" opacity=".25"/>
+  <path d="M67 192c-30 18-43 5-34-9 7-11 24-6 25-19 1-10-12-13-18-5" fill="none" stroke="#a85b2f" stroke-width="12" stroke-linecap="round"/>
+  <path d="m83 174-13 33q-3 10 8 12l25 1q11-1 7-9l-11-38m38 0 10 33q2 10 13 9l24-3q9-2 3-10l-27-34" fill="#bd7338" stroke="#884d2e" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M72 120q-2-13 14-18h54q18 5 20 24l5 49q-45 21-94 0z" fill="url(#shirt)" stroke="#a33d38" stroke-width="4"/>
+  <path d="m78 134-22 22m94-21 19 17" fill="none" stroke="#eaaa51" stroke-width="14" stroke-linecap="round"/>
+  <path d="m56 154-9-8m119 8 10-8" fill="none" stroke="#f2bd68" stroke-width="11" stroke-linecap="round"/>
+  <circle cx="62" cy="76" r="25" fill="#e9a447" stroke="#a85b2f" stroke-width="5"/>
+  <circle cx="158" cy="76" r="25" fill="#e9a447" stroke="#a85b2f" stroke-width="5"/>
+  <circle cx="62" cy="76" r="12" fill="#f2bf77"/><circle cx="158" cy="76" r="12" fill="#f2bf77"/>
+  <path d="M60 76q0-48 50-51 52 3 52 51v25q-2 49-52 51-49-2-50-51z" fill="url(#fur)" stroke="#a85b2f" stroke-width="5"/>
+  <path d="M75 96q14-17 31-7 8 5 4 20-8 19-26 17-18-4-17-17 0-7 8-13m40 0q14-17 31-7 8 5 4 20-8 19-26 17-18-4-17-17 0-7 8-13" fill="#fff0cc"/>
+  <ellipse cx="93" cy="103" rx="5" ry="7" fill="#34251e"/><ellipse cx="132" cy="103" rx="5" ry="7" fill="#34251e"/>
+  <circle cx="94" cy="101" r="1.8" fill="white"/><circle cx="133" cy="101" r="1.8" fill="white"/>
+  <ellipse cx="112" cy="119" rx="9" ry="7" fill="#75432d"/>
+  <path d="M101 132q11 11 23 0" fill="none" stroke="#8c4635" stroke-width="4" stroke-linecap="round"/>
+  <path d="m84 49 12-19 12 14 12-17 15 19" fill="#ffd76b" stroke="#a85b2f" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M75 169q36 15 79 0" fill="none" stroke="#ffdca0" stroke-width="4" opacity=".8"/>
+</svg>
