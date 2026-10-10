@@ -1,7 +1,8 @@
 (() => {
   const WEIGHT = 50;
   const NORMAL = 50;
-  const FRICTION = 50;
+  const FRICTION = 30;
+  const MAX_FORCE = 60;
 
   function mount() {
     window.ui.lessonShell('Đẩy xe vượt lực ma sát', 'Bài 02 · Trọng lực, phản lực, lực ma sát và lực tác dụng', `
@@ -9,8 +10,10 @@
         <section class="force-stage">
           <div class="force-scene" id="force-scene">
             <div class="force-scene-head"><span>🧪 MÔ PHỎNG LỰC</span><strong>Các vectơ lực luôn gắn với xe</strong></div>
+            <div class="force-speed-lines" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
             <div class="force-rig" id="force-rig">
-              <img class="force-character-art" src="assets/force/person-pushing-cart.png" alt="Người đang tác dụng lực đẩy lên xe">
+              <img class="force-character-art" src="assets/force/woman-pushing-cart.png" alt="Người phụ nữ đang tác dụng lực đẩy lên xe">
+              <div class="force-dust" aria-hidden="true"><i></i><i></i><i></i></div>
               <span class="force-origin cart-center-origin" aria-hidden="true"></span>
               <span class="force-origin cart-ground-origin" aria-hidden="true"></span>
               <div class="attached-force force-applied" id="applied-vector">
@@ -31,7 +34,7 @@
           <div class="force-control">
             <div class="sensor-readout"><div><small>DỮ LIỆU CẢM BIẾN LỰC</small><strong>Lực tay đang đẩy xe</strong></div><output class="measured" id="force-readout">0 N</output></div>
             <div class="force-slider-wrap">
-              <input id="force-slider" type="range" min="0" max="100" value="0" step="1" aria-label="Lực tác dụng mô phỏng">
+              <input id="force-slider" type="range" min="0" max="${MAX_FORCE}" value="0" step="1" aria-label="Lực tác dụng mô phỏng">
               <div class="friction-threshold"><i></i><span>Xe chuyển động khi lực đẩy vượt Fms = ${FRICTION} N</span></div>
             </div>
             <div class="force-state-row"><span>Trạng thái của xe</span><strong class="force-status still" id="force-status">● ĐỨNG YÊN</strong></div>
@@ -45,7 +48,7 @@
           <div class="metric-row force-f"><span><i>F</i> Lực tay đẩy</span><strong class="measured" id="side-force">0 N</strong></div>
           <div class="force-limit">Fms luôn cố định: <strong class="measured">${FRICTION} N</strong></div>
           <button class="secondary wide" id="toggle-values">🙈 Ẩn tất cả giá trị</button>
-          <div class="explain" id="force-explain">Trong mô hình này, Fms luôn bằng 50 N. Xe đứng yên khi lực đẩy chưa vượt qua lực ma sát.</div>
+          <div class="explain" id="force-explain">Trong mô hình này, Fms luôn bằng ${FRICTION} N. Xe đứng yên khi lực đẩy chưa vượt qua lực ma sát.</div>
           <button class="primary wide" id="force-reset">↺ Đặt lại thí nghiệm</button>
         </aside>
       </div>`);
@@ -58,6 +61,7 @@
     let lastTime = performance.now();
     const slider = document.querySelector('#force-slider');
     const rig = document.querySelector('#force-rig');
+    const scene = document.querySelector('#force-scene');
 
     function updateExplanation(friction) {
       if (valuesHidden) {
@@ -72,7 +76,7 @@
     }
 
     function setForce(next) {
-      value = Math.max(0, Math.min(100, Number(next) || 0));
+      value = Math.max(0, Math.min(MAX_FORCE, Number(next) || 0));
       const friction = FRICTION;
       slider.value = value;
       document.querySelector('#force-readout').textContent = `${value.toFixed(0)} N`;
@@ -82,12 +86,16 @@
       document.querySelector('#scene-friction-value').textContent = `${friction.toFixed(0)} N`;
       document.querySelector('#applied-vector').style.setProperty('--force-length', `${44 + value * .72}px`);
       document.querySelector('#friction-vector').style.setProperty('--friction-length', '86px');
-      document.querySelector('.friction-threshold i').style.width = `${value}%`;
+      document.querySelector('.friction-threshold i').style.width = `${value / MAX_FORCE * 100}%`;
       moving = value > FRICTION;
       const status = document.querySelector('#force-status');
       status.textContent = moving ? '● ĐANG CHUYỂN ĐỘNG' : '● ĐỨNG YÊN';
       status.className = `force-status ${moving ? 'moving' : 'still'}`;
       rig.classList.toggle('moving', moving);
+      scene.classList.toggle('moving', moving);
+      scene.classList.toggle('has-force', value > 0);
+      rig.style.setProperty('--motion-duration', `${Math.max(.22, .48 - (value - FRICTION) * .008)}s`);
+      scene.style.setProperty('--force-energy', `${value / MAX_FORCE}`);
       updateExplanation(friction);
     }
 
@@ -101,7 +109,7 @@
         if (x > 48) x = 6;
         rig.style.left = `${x}%`;
       }
-      requestAnimationFrame(animate);
+      animationFrame = requestAnimationFrame(animate);
     }
 
     slider.addEventListener('input', () => setForce(slider.value));
@@ -121,10 +129,10 @@
       if (alive && data?.type === 'force') setForce(data.value);
     });
     setForce(0);
-    const animationTimer = setInterval(animate, 50);
+    let animationFrame = requestAnimationFrame(animate);
     return () => {
       alive = false;
-      clearInterval(animationTimer);
+      cancelAnimationFrame(animationFrame);
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }

@@ -23,8 +23,8 @@
       intro: 'Thay đổi lực kéo và quan sát thời điểm xe đẩy bắt đầu chuyển động.',
       steps: [
         'Kéo thanh “Lực kéo từ cảm biến” hoặc dùng cảm biến lực đã kết nối.',
-        'Khi lực kéo không vượt quá 50 N, vật đứng yên vì lực ma sát cân bằng lực kéo.',
-        'Khi lực kéo lớn hơn 50 N, vật bắt đầu chuyển động.',
+        'Khi lực kéo không vượt quá 30 N, vật đứng yên vì lực ma sát cân bằng lực kéo.',
+        'Khi lực kéo lớn hơn 30 N, vật bắt đầu chuyển động.',
         'Ẩn hoặc hiện các giá trị để tự dự đoán kết quả, rồi chọn “Đặt lại thí nghiệm” để thử lại.'
       ],
       takeaway: 'Quan sát mối quan hệ giữa lực kéo, ma sát nghỉ cực đại và trạng thái chuyển động của vật.'

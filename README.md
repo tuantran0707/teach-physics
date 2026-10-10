@@ -3,7 +3,7 @@
 Ứng dụng Electron dành cho Raspberry Pi 3B+/4 và màn hình cảm ứng 7 inch (khuyến nghị độ phân giải 1024×600). Bản MVP gồm:
 
 - Bài 1: trò chơi **Khu vườn trên mây**. Sóc Nâu đấu với Robot hoặc học sinh thứ hai; bản đồ sinh ngẫu nhiên có kiểm tra đường đi, gồm bốn loại quả, mỗi loại xuất hiện ba lần và người chơi cần trả lời câu hỏi Vật lý để thu hoạch đủ ba loại. Sóc di chuyển từng bước có chú thích hướng; khi tới đích, trò chơi phát lại toàn bộ hành trình và so sánh quãng đường với vectơ độ dịch chuyển từ Hang Sóc tới Hội chợ.
-- Bài 2: mô phỏng vật có `P = 50 N`, `N = 50 N`, ma sát nghỉ cực đại `60 N`; hỗ trợ ẩn/hiện số liệu và nhận lực đo từ cảm biến.
+- Bài 2: mô phỏng vật có `P = 50 N`, `N = 50 N`, lực ma sát `30 N`; hỗ trợ ẩn/hiện số liệu và nhận lực đo từ cảm biến trong dải `0-60 N`.
 - Bài 3: bảng đồng hồ xe, tốc độ tức thời, xi nhan, thời gian, đồ thị và bảng vận tốc–thời gian.
 - Bài 4: vị trí mô-đun trống để bổ sung giáo án sau.
 
