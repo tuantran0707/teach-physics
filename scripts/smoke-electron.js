@@ -15,13 +15,47 @@ app.whenReady().then(async () => {
   });
   await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
 
-  const pages = ['home', 'displacement', 'force', 'speed'];
+  const audioOnly = process.argv.includes('--audio-only');
+  const pages = audioOnly ? ['displacement'] : ['home', 'displacement', 'force', 'speed'];
   const results = [];
   for (const page of pages) {
     console.log(`Kiểm tra: ${page}`);
     if (page !== 'home') {
       await window.webContents.executeJavaScript(`document.querySelector('[data-lesson="${page}"]').click()`);
       await wait(180);
+    }
+    let audioPlayback = null;
+    if (page === 'displacement' && audioOnly) {
+      audioPlayback = await window.webContents.executeJavaScript(`(async () => {
+        const audio = document.querySelector('#garden-song');
+        await Promise.race([new Promise(resolve => audio.addEventListener('loadedmetadata', resolve, { once: true })), new Promise(resolve => setTimeout(resolve, 1800))]);
+        const metadataLoaded = audio.readyState >= 1;
+        let advanced = false;
+        let playError = null;
+        if (metadataLoaded) {
+          try {
+            await audio.play();
+            const startedAt = audio.currentTime;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            advanced = audio.currentTime > startedAt;
+          } catch (error) { playError = error.name; }
+        }
+        audio.pause();
+        document.querySelector('#song-start-game').click();
+        document.querySelector('.guide-overlay [data-guide-close]')?.click();
+        return { metadataLoaded, advanced, playError, duration: Number.isFinite(audio.duration) ? audio.duration : null };
+      })()`, true);
+      await wait(180);
+    }
+    if (page === 'displacement' && !audioOnly) {
+      await window.webContents.executeJavaScript(`document.querySelector('#garden-song').pause();document.querySelector('#song-start-game').click();document.querySelector('.guide-overlay [data-guide-close]')?.click()`);
+      await wait(180);
+    }
+    if (audioOnly) {
+      console.log(JSON.stringify({ audioPlayback }, null, 2));
+      await window.close();
+      app.quit();
+      return;
     }
     const metrics = await window.webContents.executeJavaScript(`(() => ({
       page: ${JSON.stringify(page)},
@@ -33,6 +67,7 @@ app.whenReady().then(async () => {
         visible: !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length)
       })).filter(x => x.visible)
     }))()`);
+    if (audioPlayback) metrics.audioPlayback = audioPlayback;
 
     if (page === 'displacement') {
       metrics.interaction = await window.webContents.executeJavaScript(`(async () => {

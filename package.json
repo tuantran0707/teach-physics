@@ -1,7 +1,7 @@
 {
   "name": "vat-ly-tuong-tac",
   "version": "0.1.0",
-  "description": "Thiết bị học Vật lý tương tác cho Raspberry Pi 4",
+  "description": "Thiết bị học Vật lý tương tác cho Raspberry Pi 3B+/4",
   "main": "src/main.js",
   "type": "commonjs",
   "scripts": {
@@ -10,11 +10,10 @@
     "check": "node --check scripts/start-electron.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js && node --check src/renderer/lessons/displacement.js && node --check src/renderer/lessons/force.js && node --check src/renderer/lessons/speed.js",
     "smoke": "node scripts/start-electron.js scripts/smoke-electron.js"
   },
-  "dependencies": {},
-  "optionalDependencies": {
+  "dependencies": {
     "serialport": "^13.0.0"
   },
   "devDependencies": {
-    "electron": "^44.4.1"
+    "electron": "^39.8.10"
   }
 }

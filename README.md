@@ -1,6 +1,6 @@
 # Phòng thí nghiệm Vật lý tương tác
 
-Ứng dụng Electron tối ưu cho Raspberry Pi 4 và màn hình cảm ứng 7 inch (khuyến nghị độ phân giải 1024×600). Bản MVP gồm:
+Ứng dụng Electron dành cho Raspberry Pi 3B+/4 và màn hình cảm ứng 7 inch (khuyến nghị độ phân giải 1024×600). Bản MVP gồm:
 
 - Bài 1: trò chơi **Khu vườn trên mây**. Sóc Nâu đấu với Robot hoặc học sinh thứ hai; bản đồ sinh ngẫu nhiên có kiểm tra đường đi, gồm bốn loại quả, mỗi loại xuất hiện ba lần và người chơi cần trả lời câu hỏi Vật lý để thu hoạch đủ ba loại. Sóc di chuyển từng bước có chú thích hướng; khi tới đích, trò chơi phát lại toàn bộ hành trình và so sánh quãng đường với vectơ độ dịch chuyển từ Hang Sóc tới Hội chợ.
 - Bài 2: mô phỏng vật có `P = 50 N`, `N = 50 N`, ma sát nghỉ cực đại `60 N`; hỗ trợ ẩn/hiện số liệu và nhận lực đo từ cảm biến.
@@ -24,19 +24,56 @@ Chế độ phát triển có DevTools:
 npm run dev
 ```
 
-## Cài trên Raspberry Pi 4
+## Cài trên Raspberry Pi 3B+ hoặc 4
 
-Nên dùng **Raspberry Pi OS 64-bit**. Electron 44 không còn phát hành gói Linux ARM 32-bit, vì vậy hệ điều hành `armv7l` không phù hợp với phiên bản này.
+Pi 3B+ với Raspberry Pi OS 64-bit là cấu hình khuyến nghị. Với Raspberry Pi OS 32-bit (`armv7l`), dự án dùng Electron 39.8.10 để tương thích với gói Node.js 20 của Raspbian và dùng được bản Electron Linux ARM 32-bit. Electron 39 đã cũ và không còn được cập nhật bảo mật; đây chỉ là phương án tương thích tạm thời, không phù hợp để phơi ứng dụng ra Internet. Pi 3B+ chỉ có 1 GB RAM; nên đóng các ứng dụng khác trong lúc cài và chạy thử với màn hình thực tế.
+
+### 1. Kiểm tra Raspberry Pi qua SSH
+
+Từ PowerShell trên máy Windows, thay `<user>` và `<pi-ip>` bằng tài khoản và địa chỉ của Pi (SSH sẽ hỏi mật khẩu):
+
+```powershell
+ssh <user>@<pi-ip>
+```
+
+Sau khi đăng nhập, kiểm tra kiến trúc, phiên bản hệ điều hành và bộ nhớ:
+
+```bash
+uname -m
+cat /etc/os-release
+free -h
+```
+
+`uname -m` trả về `aarch64` cho OS 64-bit hoặc `armv7l` cho OS 32-bit.
+
+### 2. Cài Node.js và thư viện hệ thống
+
+Cài Node.js và npm từ kho Raspberry Pi OS:
 
 ```bash
 sudo apt update
-sudo apt install -y nodejs npm libgtk-3-0 libnss3 libasound2t64
-cd /duong-dan/den/teach-physics
-npm install
-npm start
+sudo apt install -y nodejs npm libgtk-3-0 libnss3 libgbm1 libasound2t64 \
+  fonts-noto-color-emoji libudev-dev build-essential python3
+node --version
+npm --version
 ```
 
-Ứng dụng tự toàn màn hình khi phát hiện Linux ARM/ARM64. Để tự khởi động sau khi đăng nhập desktop:
+Node.js 20 có sẵn trong Raspberry Pi OS 13 (Trixie) armhf đáp ứng yêu cầu của Electron 39.8.10. Nếu tên gói `libasound2t64` không tồn tại trên phiên bản Raspberry Pi OS đang dùng, thay bằng `libasound2`.
+
+Trên Raspberry Pi OS Desktop, cài `fonts-noto-color-emoji` để hiển thị các biểu tượng emoji trái cây và chướng ngại vật trong trò chơi; sau khi cài font, thoát hẳn và mở lại ứng dụng.
+
+### 3. Chép mã nguồn và chạy ứng dụng
+
+Đưa mã nguồn dự án lên Pi (ví dụ clone repository của bạn vào `/home/<user>/teach-physics`), sau đó cài và chạy trên Pi:
+
+```bash
+cd /home/<user>/teach-physics
+npm install
+```
+
+`npm install` tải bản Electron phù hợp với kiến trúc Pi (`armv7l` hoặc `arm64`) và cài các gói tùy chọn như `serialport`. Hãy chạy lệnh này trên Pi, không sao chép `node_modules` đã cài trên Windows. Cần kết nối Internet trong lần cài đầu tiên.
+
+Để thử chạy, mở Terminal trên desktop của Pi, vào thư mục dự án rồi chạy `npm start`. Ứng dụng cần phiên desktop đồ họa; chạy từ SSH thông thường sẽ không có màn hình để hiển thị. Ứng dụng tự toàn màn hình khi phát hiện Linux ARM/ARM64. Để tự khởi động sau khi đăng nhập desktop:
 
 ```bash
 mkdir -p ~/.config/autostart
@@ -44,7 +81,7 @@ cp deploy/vat-ly-tuong-tac.desktop ~/.config/autostart/
 nano ~/.config/autostart/vat-ly-tuong-tac.desktop
 ```
 
-Sửa đường dẫn trong dòng `Exec` cho đúng thư mục thực tế trên Pi. Có thể tắt screen blanking trong phần cấu hình Raspberry Pi để thiết bị luôn hiển thị.
+Sửa đường dẫn `/home/pi/teach-physics` trong các dòng `Exec` và `Path` thành thư mục cài thực tế (ví dụ `/home/<user>/teach-physics`). Tự khởi động yêu cầu đăng nhập vào desktop; có thể tắt screen blanking trong phần cấu hình Raspberry Pi để thiết bị luôn hiển thị.
 
 ## Kết nối phần cứng
 

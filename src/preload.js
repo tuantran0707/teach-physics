@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld('physicsBridge', {
     ipcRenderer.on('sensor:data', listener);
     return () => ipcRenderer.removeListener('sensor:data', listener);
   },
+  onSensorConnection: (callback) => {
+    const listener = (_event, status) => callback(status);
+    ipcRenderer.on('sensor:connection', listener);
+    return () => ipcRenderer.removeListener('sensor:connection', listener);
+  },
   onSensorError: (callback) => ipcRenderer.on('sensor:error', (_event, message) => callback(message)),
   onSensorWarning: (callback) => ipcRenderer.on('sensor:warning', (_event, message) => callback(message))
 });
