@@ -7,8 +7,9 @@
   "scripts": {
     "start": "node scripts/start-electron.js",
     "dev": "node scripts/start-electron.js --dev",
-    "check": "node --check scripts/start-electron.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js && node --check src/renderer/lessons/displacement.js && node --check src/renderer/lessons/force.js && node --check src/renderer/lessons/speed.js",
-    "smoke": "node scripts/start-electron.js scripts/smoke-electron.js"
+    "check": "node --check scripts/start-electron.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js && node --check src/renderer/lessons/questions.js && node --check src/renderer/lessons/displacement.js && node --check src/renderer/lessons/force.js && node --check src/renderer/lessons/speed.js",
+    "smoke": "node scripts/start-electron.js scripts/smoke-electron.js",
+    "voice": "node scripts/generate-voice.js"
   },
   "dependencies": {
     "serialport": "^13.0.0"

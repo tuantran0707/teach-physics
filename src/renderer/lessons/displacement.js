@@ -31,16 +31,57 @@
     { instance: 'strawberry-2', type: 'strawberry', name: 'Dâu tây', icon: '🍓', x: 6, y: 8 },
     { instance: 'strawberry-3', type: 'strawberry', name: 'Dâu tây', icon: '🍓', x: 2, y: 1 }
   ];
-  const PHYSICS_QUESTIONS = [
-    { text: 'Mặt Trời mọc ở hướng nào?', answers: ['Hướng Đông', 'Hướng Tây', 'Hướng Nam'], correct: 0, explain: 'Mặt Trời mọc ở hướng Đông.' },
-    { text: 'Đi 3 m về Đông rồi đi tiếp 2 m về Đông. Quãng đường là bao nhiêu?', answers: ['1 m', '5 m', '6 m'], correct: 1, explain: 'Quãng đường bằng 3 + 2 = 5 m.' },
-    { text: 'Đi 4 m về Đông rồi 4 m về Tây. Độ dịch chuyển bằng bao nhiêu?', answers: ['4 m', '8 m', '0 m'], correct: 2, explain: 'Vị trí cuối trùng vị trí đầu nên độ dịch chuyển bằng 0 m.' },
-    { text: 'Công thức tính tốc độ là gì?', answers: ['v = s / t', 'v = s × t', 'v = t / s'], correct: 0, explain: 'Tốc độ bằng quãng đường chia cho thời gian.' },
-    { text: 'Đơn vị tốc độ trong hệ SI là gì?', answers: ['m', 'm/s', 's'], correct: 1, explain: 'Đơn vị tốc độ trong hệ SI là mét trên giây.' },
-    { text: 'Đại lượng nào cho biết toàn bộ độ dài đường đã đi?', answers: ['Độ dịch chuyển', 'Thời gian', 'Quãng đường'], correct: 2, explain: 'Quãng đường là toàn bộ độ dài đường vật đã đi.' },
-    { text: 'Hướng nào đối diện với hướng Bắc?', answers: ['Hướng Đông', 'Hướng Nam', 'Hướng Tây'], correct: 1, explain: 'Hướng Nam đối diện với hướng Bắc.' },
-    { text: 'Đi được 10 m trong 2 giây thì tốc độ là bao nhiêu?', answers: ['8 m/s', '20 m/s', '5 m/s'], correct: 2, explain: 'v = s / t = 10 / 2 = 5 m/s.' }
-  ];
+  const { QUESTIONS: PHYSICS_QUESTIONS, voiceClips } = window.PhysicsQuestions;
+
+  // Giọng đọc tiếng Việt: phát file giọng AI thu sẵn assets/voice/<clip>.mp3 (tạo bằng
+  // `npm run voice`); nếu thiếu file thì thử giọng tiếng Việt của hệ điều hành (Web Speech API).
+  // read() trả về Promise, xong khi đọc hết (hoặc bị dừng / lỗi).
+  const VoiceReader = (() => {
+    let audio = null;
+    let finishCurrent = null;
+    function pickVoice() {
+      const voices = window.speechSynthesis?.getVoices() || [];
+      const vietnamese = voices.filter((voice) => /^vi/i.test(voice.lang));
+      return vietnamese.find((voice) => /natural|neural|online|google/i.test(voice.name)) || vietnamese[0] || null;
+    }
+    function speakText(text, done) {
+      const synth = window.speechSynthesis;
+      const voice = pickVoice();
+      if (!synth || !voice) { done(); return; }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'vi-VN';
+      utterance.rate = 0.92;
+      utterance.voice = voice;
+      utterance.onend = done;
+      utterance.onerror = done;
+      synth.speak(utterance);
+    }
+    function stop() {
+      window.speechSynthesis?.cancel();
+      if (audio) { audio.pause(); audio = null; }
+      finishCurrent?.();
+    }
+    function read(text, clipId) {
+      stop();
+      return new Promise((resolve) => {
+        let settled = false;
+        const done = () => { if (settled) return; settled = true; if (finishCurrent === done) finishCurrent = null; resolve(); };
+        finishCurrent = done;
+        if (!clipId) { speakText(text, done); return; }
+        const clip = new Audio(`assets/voice/${clipId}.mp3`);
+        audio = clip;
+        clip.addEventListener('ended', done, { once: true });
+        clip.addEventListener('error', () => {
+          if (audio !== clip) return;
+          audio = null;
+          speakText(text, done);
+        }, { once: true });
+        clip.play().catch(() => {});
+      });
+    }
+    window.speechSynthesis?.getVoices();
+    return { read, stop };
+  })();
   const DEFAULT_HAZARDS = [
     { x: 3, y: 1, type: 'mud', icon: '🟤', name: 'vũng bùn' },
     { x: 7, y: 2, type: 'thorn', icon: '🌵', name: 'bụi gai' },
@@ -128,7 +169,9 @@
       timers: new Set(),
       pawns: [],
       audioContext: null,
-      activeQuizResolve: null
+      activeQuizResolve: null,
+      questionDeck: [],
+      lastQuestionId: null
     };
     const grid = document.querySelector('#garden-grid');
     grid.style.setProperty('--garden-cols', COLS);
@@ -258,8 +301,11 @@
     function placePawns(animateIndex = -1) {
       state.players.forEach((player, index) => {
         const pawn = state.pawns[index];
-        pawn.classList.remove('active');
-        cellAt(player.x, player.y)?.appendChild(pawn);
+        const cell = cellAt(player.x, player.y);
+        if (cell && pawn.parentElement !== cell) {
+          pawn.classList.remove('active');
+          cell.appendChild(pawn);
+        }
         pawn.classList.toggle('active', index === state.turn);
         if (index === animateIndex) {
           pawn.classList.remove('hopping');
@@ -328,22 +374,41 @@
       overlay.remove();
     }
 
+    // Chỉ ghi vào DOM khi giá trị thay đổi, tránh vẽ lại thừa (rất tốn CPU trên Raspberry Pi).
+    function setText(selector, value) {
+      const node = document.querySelector(selector);
+      if (node && node.textContent !== String(value)) node.textContent = value;
+    }
+
+    function setHTML(selector, value) {
+      const node = document.querySelector(selector);
+      if (node && node.dataset.rendered !== value) {
+        node.innerHTML = value;
+        node.dataset.rendered = value;
+      }
+    }
+
+    function updateStats() {
+      const player = currentPlayer();
+      const elapsed = Math.max(1, (Date.now() - state.startedAt) / 1000);
+      const displacement = Math.hypot(player.x - player.startX, player.y - player.startY) * METERS_PER_CELL;
+      setText('#garden-distance', `${player.distance} m`);
+      setText('#garden-speed', (player.distance / elapsed).toFixed(2));
+      setText('#garden-velocity', (displacement / elapsed).toFixed(2));
+    }
+
     function updateUI() {
       const player = currentPlayer();
       const isCpu = state.mode === 'cpu' && state.turn === 1;
-      document.querySelector('#garden-turn').innerHTML = `<i style="background:${player.color}"></i><span>Lượt của <strong>${player.name}</strong></span>`;
-      document.querySelector('#garden-player-name').textContent = player.name;
+      setHTML('#garden-turn', `<i style="background:${player.color}"></i><span>Lượt của <strong>${player.name}</strong></span>`);
+      setText('#garden-player-name', player.name);
       const playerAvatar = document.querySelector('#garden-player-card img');
-      playerAvatar.src = player.image;
+      if (playerAvatar.getAttribute('src') !== player.image) playerAvatar.setAttribute('src', player.image);
       playerAvatar.alt = player.name;
-      document.querySelector('#turn-token').textContent = state.turn + 1;
+      setText('#turn-token', state.turn + 1);
       document.querySelector('#garden-player-card').style.setProperty('--player-color', player.color);
-      document.querySelector('#fruit-basket').innerHTML = FRUIT_TYPES.map((fruit) => `<span class="${player.collected.has(fruit.id) ? 'collected' : ''}">${fruit.icon}</span>`).join(' ');
-      document.querySelector('#garden-distance').textContent = `${player.distance} m`;
-      const elapsed = Math.max(1, (Date.now() - state.startedAt) / 1000);
-      const displacement = Math.hypot(player.x - player.startX, player.y - player.startY) * METERS_PER_CELL;
-      document.querySelector('#garden-speed').textContent = (player.distance / elapsed).toFixed(2);
-      document.querySelector('#garden-velocity').textContent = (displacement / elapsed).toFixed(2);
+      setHTML('#fruit-basket', FRUIT_TYPES.map((fruit) => `<span class="${player.collected.has(fruit.id) ? 'collected' : ''}">${fruit.icon}</span>`).join(' '));
+      updateStats();
       document.querySelector('#garden-roll').disabled = state.phase !== 'await-roll' || isCpu || state.finished;
       document.querySelector('#opponent-mode').disabled = state.players.some((item) => item.distance > 0) || state.phase !== 'await-roll';
       document.querySelector('#shuffle-map').disabled = state.players.some((item) => item.distance > 0) || state.phase !== 'await-roll' || state.turn !== 0;
@@ -351,18 +416,29 @@
       placePawns();
     }
 
+    // Đường đi đã chạm ô Hội chợ thì dừng ở đó (thắng nếu đủ 3 loại quả, nếu chưa thì cổng chặn lại),
+    // nên không bắt học sinh phải chọn cho hết số bước của xúc xắc.
+    function planReachesFair() {
+      const last = state.plan[state.plan.length - 1];
+      return Boolean(last && last.toX === FAIR.x && last.toY === FAIR.y);
+    }
+
+    function planReady() {
+      return state.plan.length > 0 && (state.plan.length === state.roll || planReachesFair());
+    }
+
     function updatePlanningControls() {
       const manualTurn = !(state.mode === 'cpu' && state.turn === 1);
       const planning = state.phase === 'planning' && manualTurn;
-      const remaining = Math.max(0, state.roll - state.plan.length);
+      const remaining = planReachesFair() ? 0 : Math.max(0, state.roll - state.plan.length);
       document.querySelector('#garden-dice').textContent = state.roll ? DICE[state.roll - 1] : '?';
       document.querySelector('#step-status').textContent = state.roll ? `${state.roll} bước` : 'Chưa gieo';
       document.querySelector('#plan-status').textContent = planning
-        ? (remaining ? `Còn chọn ${remaining} bước` : 'Đường đi đã sẵn sàng')
+        ? (remaining ? `Còn chọn ${remaining} bước` : (planReachesFair() ? 'Tới Hội chợ · dừng tại đây' : 'Đường đi đã sẵn sàng'))
         : (state.phase === 'moving' || state.phase === 'cpu' ? 'Sóc đang di chuyển…' : 'Hãy gieo xúc xắc');
       document.querySelectorAll('[data-direction]').forEach((button) => { button.disabled = !planning || remaining === 0; });
       document.querySelector('#undo-step').disabled = !planning || state.plan.length === 0;
-      document.querySelector('#execute-route').disabled = !planning || state.plan.length !== state.roll;
+      document.querySelector('#execute-route').disabled = !planning || !planReady();
     }
 
     function clearRoute() {
@@ -389,6 +465,10 @@
 
     function addDirection(directionKey) {
       if (state.phase !== 'planning' || state.plan.length >= state.roll) return;
+      if (planReachesFair()) {
+        window.ui.showToast('Đã tới Hội chợ · Bấm “Cho Sóc đi”', 'success');
+        return;
+      }
       const direction = DIRECTIONS[directionKey];
       const player = currentPlayer();
       const previous = state.plan[state.plan.length - 1];
@@ -415,6 +495,7 @@
       if (state.phase !== 'await-roll' || state.finished) return;
       state.phase = 'rolling';
       document.querySelector('#opponent-mode').disabled = true;
+      document.querySelector('#garden-roll').disabled = true;
       const value = Math.floor(Math.random() * 6) + 1;
       await showDicePopup(value, currentPlayer().name);
       if (!state.alive) return;
@@ -424,6 +505,23 @@
       updateUI();
     }
 
+    // Bốc câu hỏi từ một "bộ bài" đã xáo: hết cả bộ mới xáo lại, nên không bị lặp câu
+    // (và câu đầu bộ mới không trùng câu vừa hỏi).
+    function nextQuestion() {
+      if (!state.questionDeck.length) {
+        const deck = [...PHYSICS_QUESTIONS];
+        for (let i = deck.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+        if (deck.length > 1 && deck[deck.length - 1].id === state.lastQuestionId) [deck[0], deck[deck.length - 1]] = [deck[deck.length - 1], deck[0]];
+        state.questionDeck = deck;
+      }
+      const question = state.questionDeck.pop();
+      state.lastQuestionId = question.id;
+      return question;
+    }
+
     async function askPhysicsQuestion(player, fruit) {
       const isCpu = state.mode === 'cpu' && state.turn === 1;
       if (isCpu) {
@@ -431,17 +529,21 @@
         if (state.alive) window.ui.showToast(`${player.name} đã trả lời đúng để hái ${fruit.name}!`, 'success');
         return state.alive;
       }
-      const question = PHYSICS_QUESTIONS[Math.floor(Math.random() * PHYSICS_QUESTIONS.length)];
+      const question = nextQuestion();
+      const clips = voiceClips(question);
       const overlay = document.createElement('div');
       overlay.className = 'physics-quiz-overlay';
       overlay.innerHTML = `<div class="physics-quiz-card" role="dialog" aria-modal="true" aria-label="Câu hỏi thu hoạch trái cây">
         <div class="quiz-header"><div class="quiz-fruit">${fruit.icon}</div><div><small>THỬ THÁCH THU HOẠCH</small><strong>Trả lời đúng để hái ${fruit.name}</strong></div></div>
-        <div class="quiz-question"><span>CÂU HỎI VẬT LÝ</span><h2>${question.text}</h2></div>
+        <div class="quiz-question"><span>CÂU HỎI VẬT LÝ</span><button type="button" class="quiz-voice" data-voice aria-label="Nghe lại câu hỏi">🔊 Nghe</button><h2>${question.text}</h2></div>
         <div class="quiz-options">${question.answers.map((answer, index) => `<button class="quiz-option" data-answer="${index}" data-correct="${index === question.correct}"><b>${String.fromCharCode(65 + index)}</b><span>${answer}</span></button>`).join('')}</div>
         <p class="quiz-feedback" aria-live="polite">Chọn một đáp án</p>
       </div>`;
       document.querySelector('.lesson-page').appendChild(overlay);
       speak(question.text);
+      const readQuestion = () => VoiceReader.read(clips[question.id], question.id);
+      overlay.querySelector('[data-voice]').addEventListener('click', readQuestion);
+      readQuestion();
       return new Promise((resolve) => {
         let answered = false;
         const finish = (correct) => {
@@ -467,7 +569,10 @@
             feedback.classList.add(correct ? 'success' : 'error');
             playClack(correct ? 320 : 75);
             speak(feedback.textContent);
-            await wait(650);
+            // Đợi đọc xong lời giải thích (tối đa 9 giây) để học sinh kịp nghe và đọc.
+            const feedbackClip = `${question.id}-${correct ? 'dung' : 'sai'}`;
+            await Promise.all([wait(900), Promise.race([VoiceReader.read(clips[feedbackClip], feedbackClip), wait(9000)])]);
+            if (!state.alive) return;
             finish(correct);
           });
         });
@@ -598,7 +703,7 @@
     }
 
     async function executeHumanRoute() {
-      if (state.phase !== 'planning' || state.plan.length !== state.roll) return;
+      if (state.phase !== 'planning' || !planReady()) return;
       state.phase = 'moving';
       updatePlanningControls();
       const player = currentPlayer();
@@ -680,6 +785,16 @@
       if (state.mode === 'cpu' && state.turn === 1) runCpuTurn();
     }
 
+    function describeDirection(east, north) {
+      if (!east && !north) return 'không có hướng (về chỗ cũ)';
+      const vertical = north > 0 ? 'Bắc' : 'Nam';
+      const horizontal = east > 0 ? 'Đông' : 'Tây';
+      if (!north) return `hướng ${horizontal}`;
+      if (!east) return `hướng ${vertical}`;
+      const angle = Math.atan2(Math.abs(north), Math.abs(east)) * 180 / Math.PI;
+      return `hướng ${horizontal}–${vertical}, lệch ${angle.toFixed(0)}° về ${vertical} so với hướng ${horizontal}`;
+    }
+
     async function finishGame(winner) {
       if (state.finished) return;
       state.finished = true;
@@ -696,21 +811,61 @@
       const mapSummary = await drawJourneyReview(winner, displacement);
       if (!state.alive || !mapSummary) return;
       state.phase = 'finished';
+      const distance = winner.distance;
+      const detour = Math.max(0, distance - displacement);
+      const ratio = displacement > 0 ? distance / displacement : 0;
+      const eastMeters = (winner.x - winner.startX) * METERS_PER_CELL;
+      const northMeters = (winner.startY - winner.y) * METERS_PER_CELL;
+      const directionText = describeDirection(eastMeters, northMeters);
+      const sameValue = Math.abs(detour) < 0.05;
       const overlay = document.createElement('div');
       overlay.className = 'result-overlay garden-result';
-      overlay.innerHTML = `<div class="result-card"><div class="trophy">🏆🐿️🎪</div><h2>${winner.name} chiến thắng!</h2>
-        <p>Đã mang đủ 3 loại trái cây tới Hội chợ trước khi trời lặn.</p>
-        <div class="physics-summary">
-          <div><strong>${winner.distance.toFixed(0)} m</strong><span>Quãng đường đã đi</span></div>
-          <div><strong>${displacement.toFixed(1)} m</strong><span>Độ dịch chuyển Hang → Hội chợ</span></div>
-          <div><strong>${averageSpeed.toFixed(2)} m/s</strong><span>Tốc độ trung bình</span></div>
-          <div><strong>${averageVelocity.toFixed(2)} m/s</strong><span>Vận tốc TB · (${velocityEast.toFixed(2)} Đông; ${velocityNorth.toFixed(2)} Bắc)</span></div>
+      overlay.innerHTML = `<div class="result-card garden-result-card"><div class="trophy">🏆🐿️🎪</div><h2>${winner.name} chiến thắng!</h2>
+        <p>Đã mang đủ 3 loại trái cây tới Hội chợ trước khi trời lặn · Thời gian t = ${elapsed.toFixed(0)} s</p>
+        <div class="compare-grid">
+          <section class="compare-block">
+            <h3>📏 Quãng đường <em>s</em> và độ dịch chuyển <em>d</em></h3>
+            <div class="compare-pair">
+              <div class="route"><small>Quãng đường s</small><strong>${distance.toFixed(0)} m</strong><span>Đo dọc theo đường đi (đường xanh)</span></div>
+              <b>${sameValue ? '=' : '&gt;'}</b>
+              <div class="vector"><small>Độ dịch chuyển d</small><strong>${displacement.toFixed(1)} m</strong><span>Đoạn thẳng Hang → Hội chợ (mũi tên tím) · ${directionText}</span></div>
+            </div>
+            <p>${sameValue ? 'Sóc đi thẳng một hướng nên s = d.' : `Sóc đi vòng thêm <b>${detour.toFixed(1)} m</b>, quãng đường gấp <b>${ratio.toFixed(1)} lần</b> độ dịch chuyển.`} Quãng đường chỉ có độ lớn; độ dịch chuyển có cả độ lớn và hướng. Luôn có s ≥ d.</p>
+          </section>
+          <section class="compare-block">
+            <h3>⚡ Tốc độ trung bình và vận tốc trung bình</h3>
+            <div class="compare-pair">
+              <div class="route"><small>Tốc độ TB = s / t</small><strong>${averageSpeed.toFixed(2)} m/s</strong><span>${distance.toFixed(0)} m ÷ ${elapsed.toFixed(0)} s</span></div>
+              <b>${sameValue ? '=' : '&gt;'}</b>
+              <div class="vector"><small>Vận tốc TB = d / t</small><strong>${averageVelocity.toFixed(2)} m/s</strong><span>${displacement.toFixed(1)} m ÷ ${elapsed.toFixed(0)} s · ${directionText}</span></div>
+            </div>
+            <p>Vận tốc TB có hướng: ${velocityEast.toFixed(2)} m/s về Đông, ${velocityNorth.toFixed(2)} m/s về Bắc. Vì s ≥ d nên tốc độ TB luôn ≥ độ lớn vận tốc TB${sameValue ? '' : ` (ở đây gấp ${ratio.toFixed(1)} lần)`}.</p>
+          </section>
         </div>
         <p class="lesson-note">Đường màu xanh là toàn bộ hành trình của Sóc. Mũi tên tím là độ dịch chuyển có hướng, nối thẳng từ Hang Sóc tới Hội chợ.</p>
-        <div class="result-actions"><button class="secondary" data-review>🗺️ Xem đường đi</button><button class="primary" data-replay>Chơi lại</button></div></div>`;
+        <div class="result-actions"><button class="secondary" data-review>🗺️ Xem lại quá trình</button><button class="primary" data-replay>Chơi lại</button></div></div>`;
       document.querySelector('.lesson-page').appendChild(overlay);
-      overlay.querySelector('[data-review]').addEventListener('click', () => overlay.classList.add('review-hidden'));
-      mapSummary.querySelector('[data-show-result]').addEventListener('click', () => overlay.classList.remove('review-hidden'));
+      const backButton = document.createElement('button');
+      backButton.type = 'button';
+      backButton.className = 'primary garden-back-result';
+      backButton.textContent = '📊 Quay lại kết quả';
+      document.querySelector('.garden-board-panel').appendChild(backButton);
+      const showResult = () => {
+        overlay.classList.remove('review-hidden');
+        backButton.classList.remove('visible');
+      };
+      overlay.querySelector('[data-review]').addEventListener('click', async () => {
+        overlay.classList.add('review-hidden');
+        backButton.classList.add('visible');
+        if (state.replaying) return;
+        state.replaying = true;
+        await drawJourneyReview(winner, displacement);
+        state.replaying = false;
+      });
+      backButton.addEventListener('click', showResult);
+      grid.addEventListener('click', (event) => {
+        if (event.target.closest('[data-show-result]')) showResult();
+      });
       overlay.querySelector('[data-replay]').addEventListener('click', () => {
         cleanup();
         window.ui.goHome();
@@ -765,14 +920,15 @@
       const elapsed = (Date.now() - state.startedAt) / 1000;
       const progress = Math.min(100, elapsed / 600 * 100);
       const sun = document.querySelector('#sun-progress');
-      if (sun) sun.style.width = `${progress}%`;
-      updateUI();
+      if (sun) sun.style.width = `${progress.toFixed(1)}%`;
+      updateStats();
     }, 1000);
     updateUI();
 
     function cleanup() {
       state.alive = false;
       state.activeQuizResolve?.();
+      VoiceReader.stop();
       clearInterval(statsTimer);
       state.timers.forEach(clearTimeout);
       state.timers.clear();

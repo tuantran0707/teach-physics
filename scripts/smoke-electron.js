@@ -5,6 +5,11 @@ app.disableHardwareAcceleration();
 ipcMain.handle('serial:list', async () => []);
 ipcMain.handle('serial:connect', async () => ({ ok: true }));
 ipcMain.handle('serial:disconnect', async () => ({ ok: true }));
+let esp32Running = false;
+ipcMain.handle('esp32:connect', async (_event, address) => ({ ok: true, address: `http://${address}`, telemetry: { type: 'speed', value: 0, elapsed_s: 0, running: false } }));
+ipcMain.handle('esp32:status', async () => ({ ok: true, telemetry: { type: 'speed', value: esp32Running ? 6.4 : 0, elapsed_s: esp32Running ? 1 : 0, running: esp32Running } }));
+ipcMain.handle('esp32:command', async (_event, command) => { esp32Running = command === 'start'; return { ok: true, command }; });
+ipcMain.handle('esp32:disconnect', async () => ({ ok: true }));
 
 async function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
@@ -165,9 +170,12 @@ app.whenReady().then(async () => {
       })()`);
     }
     if (page === 'speed') {
-      await window.webContents.executeJavaScript(`document.querySelector('#trip-toggle').click()`);
+      await window.webContents.executeJavaScript(`document.querySelector('#esp32-connect').click();document.querySelector('#esp32-ip').value='192.168.1.50';document.querySelector('#esp32-submit').click()`);
+      await wait(100);
+      await window.webContents.executeJavaScript(`document.querySelector('#car-start').click()`);
       await wait(1600);
-      metrics.interaction = await window.webContents.executeJavaScript(`({ rows: document.querySelectorAll('#speed-rows tr').length, speed: document.querySelector('#speed-value').textContent })`);
+      metrics.interaction = await window.webContents.executeJavaScript(`({ rows: document.querySelectorAll('#speed-rows tr').length, columns: document.querySelectorAll('.data-table th').length, speed: document.querySelector('#speed-value').textContent, connected: document.querySelector('#esp32-connect').classList.contains('connected'), controlsVisible: !document.querySelector('#car-start').hidden && !document.querySelector('#car-stop').hidden })`);
+      await window.webContents.executeJavaScript(`document.querySelector('#car-stop').click()`);
     }
     results.push(metrics);
     if (page !== 'home') {

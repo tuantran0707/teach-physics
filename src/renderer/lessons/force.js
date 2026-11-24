@@ -99,6 +99,11 @@
       updateExplanation(friction);
     }
 
+    // Dịch xe bằng transform (CSS vẫn đặt left:6%) để không phải tính lại bố cục mỗi khung hình.
+    function placeRig() {
+      rig.style.transform = `translate3d(${(x - 6) / 100 * scene.clientWidth}px,0,0)`;
+    }
+
     function animate() {
       if (!alive) return;
       const now = performance.now();
@@ -107,7 +112,7 @@
       if (moving) {
         x += (value - FRICTION) * .42 * dt;
         if (x > 48) x = 6;
-        rig.style.left = `${x}%`;
+        placeRig();
       }
       animationFrame = requestAnimationFrame(animate);
     }
@@ -122,7 +127,7 @@
     });
     document.querySelector('#force-reset').addEventListener('click', () => {
       x = 6;
-      rig.style.left = '6%';
+      placeRig();
       setForce(0);
     });
     const unsubscribe = window.physicsBridge.onSensorData((data) => {

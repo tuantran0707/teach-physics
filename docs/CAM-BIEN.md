@@ -14,10 +14,6 @@ Quy trình hiệu chuẩn:
 
 Trong mô hình bài học, lực ma sát được đặt ở mức **30 N**. Khi lực tác dụng vượt 30 N, xe bắt đầu chuyển động. Giá trị lực cảm biến được giới hạn tối đa ở 60 N.
 
-Firmware FSR402 ánh xạ tuyến tính dải ADC từ `ADC_ZERO` tới `ADC_SATURATION` thành 0–60 N. Cách này ưu tiên khả năng điều khiển đồng đều trên giao diện; FSR402 không phải load cell nên giá trị Newton chỉ mang tính mô phỏng nếu chưa hiệu chuẩn bằng tải chuẩn.
-
-Để số đo ổn định, firmware lọc EMA với hệ số `0,30`, dùng vùng chết `3 N` và làm tròn đầu ra theo bước `0,5 N`. Dữ liệu vẫn được gửi mỗi 200 ms nhưng giá trị hiển thị chỉ thay đổi khi lực lệch ít nhất 3 N.
-
 ## 2. Cảm biến vận tốc
 
 Gắn nam châm lên bánh xe và dùng cảm biến Hall, hoặc dùng encoder. Với bán kính bánh `r` (m), chu vi là `C = 2πr`. Nếu đo được `p` xung trong khoảng `Δt`, cảm biến có `k` xung/vòng:

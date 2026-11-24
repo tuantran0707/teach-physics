@@ -8,9 +8,43 @@ let serialPort;
 let serialBuffer = '';
 let serialConnecting = false;
 let reconnectTimer;
+let esp32BaseUrl = '';
 const DEFAULT_FORCE_PORT = '/dev/ttyUSB0';
 const SERIAL_BAUD_RATE = 115200;
 const RECONNECT_DELAY_MS = 3000;
+const ESP32_TIMEOUT_MS = 4000;
+
+function normalizeEsp32Address(input) {
+  const raw = String(input || '').trim();
+  if (!raw) throw new Error('Vui lòng nhập IP của xe ESP32');
+  const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`);
+  const parts = url.hostname.split('.').map(Number);
+  const isIpv4 = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(url.hostname) && parts.every((part) => part <= 255);
+  const isPrivate = isIpv4 && (parts[0] === 10 || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 168) || (parts[0] === 169 && parts[1] === 254));
+  const isLocalName = /^[a-z0-9-]+\.local$/i.test(url.hostname);
+  if (url.protocol !== 'http:' || (!isPrivate && !isLocalName) || url.username || url.password) {
+    throw new Error('Hãy nhập IP nội bộ của ESP32, ví dụ 192.168.1.50');
+  }
+  return `${url.protocol}//${url.host}`;
+}
+
+async function requestEsp32(pathname, method = 'GET') {
+  if (!esp32BaseUrl) throw new Error('Xe ESP32 chưa kết nối');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ESP32_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${esp32BaseUrl}${pathname}`, { method, cache: 'no-store', signal: controller.signal });
+    // /status có thể kèm tới 64 lần đo (~120 byte/lần) nên cho phép tới 16 KB.
+    const body = (await response.text()).slice(0, 16384);
+    if (!response.ok) throw new Error(`ESP32 trả về HTTP ${response.status}`);
+    return body;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('ESP32 không phản hồi trong 4 giây');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function configureLinuxSerial(serialPath, baudRate) {
   return new Promise((resolve, reject) => {
@@ -94,6 +128,9 @@ function scheduleSerialReconnect(error) {
 function createWindow() {
   const display = screen.getPrimaryDisplay();
   const isPi = process.platform === 'linux' && ['arm', 'arm64'].includes(process.arch);
+  // Chế độ nhẹ: trên Pi 3 Chromium không dùng được GPU (VC4 chỉ có GLES 2.0) nên
+  // mọi hiệu ứng blur/bóng đổ/animation đều do CPU vẽ. PHYSICS_LITE=1/0 để ép bật/tắt.
+  const liteMode = process.env.PHYSICS_LITE ? process.env.PHYSICS_LITE === '1' : isPi;
 
   mainWindow = new BrowserWindow({
     width: Math.min(1024, display.workAreaSize.width),
@@ -106,7 +143,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      additionalArguments: liteMode ? ['--physics-lite'] : []
     }
   });
 
@@ -164,6 +202,39 @@ ipcMain.handle('serial:list', listSerialPorts);
 ipcMain.handle('serial:connect', connectSerial);
 ipcMain.handle('serial:disconnect', async () => {
   await closeSerialPort();
+  return { ok: true };
+});
+ipcMain.handle('esp32:connect', async (_event, address) => {
+  try {
+    esp32BaseUrl = normalizeEsp32Address(address);
+    const telemetry = JSON.parse(await requestEsp32('/status?since=0'));
+    if (telemetry?.type !== 'speed') throw new Error('Dữ liệu /status không hợp lệ');
+    return { ok: true, address: esp32BaseUrl, telemetry };
+  } catch (error) {
+    esp32BaseUrl = '';
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('esp32:status', async (_event, since) => {
+  try {
+    // since = số thứ tự lần đo cuối Pi đã nhận; ESP32 chỉ trả các lần đo mới hơn.
+    const sinceSeq = Number.isSafeInteger(since) && since > 0 ? since : 0;
+    return { ok: true, telemetry: JSON.parse(await requestEsp32(`/status?since=${sinceSeq}`)) };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('esp32:command', async (_event, command) => {
+  if (!['start', 'stop', 'reset'].includes(command)) return { ok: false, error: 'Lệnh không hợp lệ' };
+  try {
+    await requestEsp32(`/${command}`, 'POST');
+    return { ok: true, command };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('esp32:disconnect', async () => {
+  esp32BaseUrl = '';
   return { ok: true };
 });
 

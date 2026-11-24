@@ -87,6 +87,8 @@ footer span:first-child { color: var(--green); }
 .primary, .secondary, .answer-btn { min-height: 44px; border-radius: 13px; border: 1px solid transparent; padding: 10px 18px; font-weight: 800; cursor: pointer; }
 .primary { background: var(--cyan); color: #041318; }
 .secondary { background: var(--panel-2); border-color: var(--border); }
+.danger { min-height:44px;padding:10px 18px;border:1px solid #ff8b9566;border-radius:13px;background:#5b1f2a;color:#ffdce0;font-weight:800;cursor:pointer }
+.primary:disabled,.secondary:disabled,.danger:disabled,.chip:disabled{opacity:.42;cursor:not-allowed}
 .wide { width: 100%; }
 .chip { padding: 9px 13px; border-radius: 12px; background: var(--panel); color: var(--muted); border: 1px solid var(--border); cursor: pointer; }
 .chip.active { color: #06141c; background: var(--cyan); }
@@ -108,7 +110,8 @@ footer span:first-child { color: var(--green); }
 .modal-head { display: flex; justify-content: space-between; align-items: flex-start; }
 .modal h2 { margin: 0 0 4px; } .modal p { color: var(--muted); margin: 0 0 18px; }
 .modal label { display: grid; gap: 7px; color: var(--muted); }
-.modal select { width: 100%; background: #07111f; color: white; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.modal select,.modal input { width: 100%; background: #07111f; color: white; border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.esp32-error{min-height:18px;margin:-5px 0 10px!important;color:var(--red)!important;font-size:12px;font-weight:800}
 .code-hint { padding: 12px; margin: 14px 0; background: #07111f; color: var(--green); border-radius: 12px; line-height: 1.7; }
 .toast { position: fixed; left: 50%; bottom: -70px; z-index: 50; transform: translateX(-50%); padding: 12px 20px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); box-shadow: 0 12px 35px #0008; transition: bottom .25s; }
 .toast.show { bottom: 24px; } .toast.success { color: var(--green); } .toast.error { color: var(--red); }
@@ -250,6 +253,7 @@ footer span:first-child { color: var(--green); }
 .gauge { width:min(300px,36vw); aspect-ratio:1; border-radius:50%; background:conic-gradient(from 225deg,var(--cyan) var(--gauge,0deg),#17283a var(--gauge,0deg) 270deg,transparent 270deg); position:relative; display:grid; place-items:center; }
 .gauge::before{content:'';position:absolute;inset:15px;background:var(--panel);border-radius:50%}.gauge-value{position:relative;text-align:center}.gauge-value strong{font-size:clamp(47px,8vw,76px);line-height:.9}.gauge-value span{display:block;color:var(--muted);margin-top:8px}.dashboard-icons { position:absolute; top:20px; left:20px; right:20px; display:flex;justify-content:space-between;color:var(--muted);font-size:20px}.indicator.on{color:var(--green);text-shadow:0 0 10px var(--green)}
 .speed-controls { position:absolute; bottom:17px; display:flex; gap:8px; }
+.topbar-actions #esp32-connect.connected{border-color:#42d39288;color:var(--green);background:#102d29}
 .telemetry { padding:14px; display:flex;flex-direction:column;min-width:0; }.telemetry-head{display:flex;justify-content:space-between;align-items:center}.telemetry h3{margin:0}.timer{color:var(--cyan);font-variant-numeric:tabular-nums}.chart-wrap{height:45%;min-height:150px;background:#081523;border-radius:12px;margin:11px 0;padding:8px}.chart-wrap canvas{width:100%;height:100%}.table-wrap{flex:1;overflow:auto;border-radius:10px}.data-table{width:100%;border-collapse:collapse;font-size:12px}.data-table th{position:sticky;top:0;background:#17283a;color:var(--muted)}.data-table td,.data-table th{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border)}.data-table td:first-child,.data-table th:first-child{text-align:left}
 
 @media (max-height: 650px) {
@@ -258,3 +262,26 @@ footer span:first-child { color: var(--green); }
   .squirrel-pawn::after{display:none}.thorn-art{padding:1px;font-size:34px;transform:translateY(-2px)}.mud-art{width:38px;height:22px}.hole-art{width:42px;height:25px}.hazard-warning{top:2px;left:2px;width:17px;height:17px;font-size:11px}.fruit-object{font-size:24px}.fair-tent{font-size:35px}.garden-cell small{font-size:9px}.garden-legend{min-height:21px;font-size:9px;gap:12px}
 }
 
+
+/* Bài 1 · Kết quả: so sánh s–d, tốc độ–vận tốc; nút quay lại kết quả; giọng đọc câu hỏi */
+.garden-result-card{width:min(760px,92vw);max-height:calc(100% - 20px);overflow-y:auto;padding:18px 22px}.garden-result-card .trophy{font-size:40px}.garden-result-card>p{margin:4px 0 10px}
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0 10px;text-align:left}.compare-block{padding:10px 12px;border:1px solid #ffffff1f;border-radius:13px;background:#081523}.compare-block h3{margin:0 0 8px;color:white;font-size:14px}.compare-block h3 em{color:var(--cyan);font-style:italic}.compare-block p{margin:8px 0 0;color:#b9c8d6;font-size:12px;line-height:1.45}.compare-block p b{color:white}
+.compare-pair{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:7px}.compare-pair>b{color:#f3c36f;font-size:24px}.compare-pair div{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px;border-radius:10px;border-left:4px solid}.compare-pair .route{border-color:#32e4e8;background:#0c2a33}.compare-pair .vector{border-color:#d29cff;background:#221a36}.compare-pair small{color:#9fb2c4;font-size:10px;font-weight:900}.compare-pair strong{color:white;font-size:20px}.compare-pair .route strong{color:#32e4e8}.compare-pair .vector strong{color:#d29cff}.compare-pair span{color:#8da0b9;font-size:10px;line-height:1.3}
+.garden-back-result{position:absolute;z-index:20;top:12px;right:12px;display:none;min-height:42px;padding:8px 16px;font-size:14px;box-shadow:0 8px 22px #000b}.garden-back-result.visible{display:block;animation:fruit-float 1.6s ease-in-out infinite}
+.quiz-voice{float:right;min-height:30px;padding:3px 11px;border:1px solid #65b7ca88;border-radius:9px;background:#12324a;color:white;font-size:13px;font-weight:900}
+@media (max-width:900px){.compare-grid{grid-template-columns:1fr}}
+
+/* Chế độ nhẹ cho Raspberry Pi (class physics-lite do preload.js gắn khi chạy trên Pi).
+   Chromium trên Pi 3 vẽ hoàn toàn bằng CPU, nên bỏ blur/bóng đổ và các animation
+   trang trí lặp vô hạn; giữ lại các chuyển động có ý nghĩa vật lý (xe chạy, đường cuộn, bụi). */
+html.physics-lite *,html.physics-lite *::before,html.physics-lite *::after{backdrop-filter:none!important;filter:none!important;text-shadow:none!important}
+html.physics-lite .squirrel-2:not(.robot-pawn){filter:hue-rotate(155deg)!important}
+html.physics-lite .fruit-basket strong span:not(.collected){filter:grayscale(1)!important}
+html.physics-lite .pawn:not(.active){opacity:.8}
+html.physics-lite .song-cloud,html.physics-lite .song-monkey,html.physics-lite .song-elephant,html.physics-lite .song-fruit,
+html.physics-lite .pawn.active,html.physics-lite .fruit-object,html.physics-lite .force-character-art,html.physics-lite .force-origin,
+html.physics-lite .force-scene.has-force .force-applied .force-line,html.physics-lite .force-scene.moving::after,
+html.physics-lite .garden-back-result.visible{animation:none}
+html.physics-lite .pawn.step-in{animation:pawn-hop .46s cubic-bezier(.22,.8,.35,1)}
+html.physics-lite .fruit-burst .fruit-object{animation:fruit-burst .75s ease-out}
+html.physics-lite .step-preview{animation:none;box-shadow:inset 0 0 0 4px #ffd35f!important}

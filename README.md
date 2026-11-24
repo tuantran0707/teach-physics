@@ -73,6 +73,14 @@ npm install
 
 `npm install` tải bản Electron phù hợp với kiến trúc Pi (`armv7l` hoặc `arm64`) và cài các gói tùy chọn như `serialport`. Hãy chạy lệnh này trên Pi, không sao chép `node_modules` đã cài trên Windows. Cần kết nối Internet trong lần cài đầu tiên.
 
+Nếu `npm start` báo `spawn .../electron.exe EACCES`, thư mục `node_modules` đang chứa Electron bản Windows. Cài lại đúng binary Linux ngay trên Pi, không xóa `package-lock.json`:
+
+```bash
+rm -rf node_modules
+npm install
+npm start
+```
+
 Để thử chạy, mở Terminal trên desktop của Pi, vào thư mục dự án rồi chạy `npm start`. Ứng dụng cần phiên desktop đồ họa; chạy từ SSH thông thường sẽ không có màn hình để hiển thị. Ứng dụng tự toàn màn hình khi phát hiện Linux ARM/ARM64. Để tự khởi động sau khi đăng nhập desktop:
 
 ```bash
