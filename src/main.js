@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFile } = require('node:child_process');
+const dgram = require('node:dgram');
 
 let mainWindow;
 let serialPort;
@@ -13,6 +14,42 @@ const DEFAULT_FORCE_PORT = '/dev/ttyUSB0';
 const SERIAL_BAUD_RATE = 115200;
 const RECONNECT_DELAY_MS = 3000;
 const ESP32_TIMEOUT_MS = 4000;
+// Xe gửi gói UDP tới cổng này ngay khi đo được vận tốc tại một vạch (không phải chờ Pi hỏi).
+const ESP32_PUSH_PORT = 4210;
+let pushSocket = null;
+
+function esp32Host() {
+  return esp32BaseUrl ? new URL(esp32BaseUrl).hostname : '';
+}
+
+function startEsp32Push() {
+  if (pushSocket) return;
+  const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  socket.on('message', (message, remote) => {
+    const host = esp32Host();
+    // Chỉ nhận gói từ đúng xe đang kết nối (khi kết nối bằng địa chỉ IP).
+    if (!host || (/^\d+\.\d+\.\d+\.\d+$/.test(host) && remote.address !== host)) return;
+    let data;
+    try {
+      data = JSON.parse(message.toString('utf8'));
+    } catch {
+      return;
+    }
+    if (data?.type === 'speed_event') mainWindow?.webContents.send('esp32:event', data);
+  });
+  socket.on('error', (error) => {
+    console.warn(`Không mở được cổng UDP ${ESP32_PUSH_PORT}: ${error.message}. Dùng chế độ hỏi định kỳ.`);
+    stopEsp32Push();
+  });
+  socket.bind(ESP32_PUSH_PORT);
+  pushSocket = socket;
+}
+
+function stopEsp32Push() {
+  if (!pushSocket) return;
+  try { pushSocket.close(); } catch { /* đã đóng */ }
+  pushSocket = null;
+}
 
 function normalizeEsp32Address(input) {
   const raw = String(input || '').trim();
@@ -207,11 +244,14 @@ ipcMain.handle('serial:disconnect', async () => {
 ipcMain.handle('esp32:connect', async (_event, address) => {
   try {
     esp32BaseUrl = normalizeEsp32Address(address);
-    const telemetry = JSON.parse(await requestEsp32('/status?since=0'));
+    // udp=<cổng>: xe ghi nhớ IP của Pi để gửi ngay từng số đo.
+    const telemetry = JSON.parse(await requestEsp32(`/status?since=0&udp=${ESP32_PUSH_PORT}`));
     if (telemetry?.type !== 'speed') throw new Error('Dữ liệu /status không hợp lệ');
+    startEsp32Push();
     return { ok: true, address: esp32BaseUrl, telemetry };
   } catch (error) {
     esp32BaseUrl = '';
+    stopEsp32Push();
     return { ok: false, error: error.message };
   }
 });
@@ -219,7 +259,7 @@ ipcMain.handle('esp32:status', async (_event, since) => {
   try {
     // since = số thứ tự lần đo cuối Pi đã nhận; ESP32 chỉ trả các lần đo mới hơn.
     const sinceSeq = Number.isSafeInteger(since) && since > 0 ? since : 0;
-    return { ok: true, telemetry: JSON.parse(await requestEsp32(`/status?since=${sinceSeq}`)) };
+    return { ok: true, telemetry: JSON.parse(await requestEsp32(`/status?since=${sinceSeq}&udp=${ESP32_PUSH_PORT}`)) };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -235,6 +275,7 @@ ipcMain.handle('esp32:command', async (_event, command) => {
 });
 ipcMain.handle('esp32:disconnect', async () => {
   esp32BaseUrl = '';
+  stopEsp32Push();
   return { ok: true };
 });
 

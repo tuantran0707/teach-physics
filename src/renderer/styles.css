@@ -285,3 +285,13 @@ html.physics-lite .garden-back-result.visible{animation:none}
 html.physics-lite .pawn.step-in{animation:pawn-hop .46s cubic-bezier(.22,.8,.35,1)}
 html.physics-lite .fruit-burst .fruit-object{animation:fruit-burst .75s ease-out}
 html.physics-lite .step-preview{animation:none;box-shadow:inset 0 0 0 4px #ffd35f!important}
+
+/* Bàn phím số nhập IP xe (màn hình cảm ứng không có bàn phím) */
+.esp32-overlay .modal{max-height:calc(100vh - 24px);overflow-y:auto;padding:16px 20px}
+.esp32-overlay .modal p{margin-bottom:10px}
+.esp32-overlay .modal input{font-size:22px;font-weight:800;letter-spacing:.04em;text-align:center;padding:9px}
+.ip-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}
+.ip-keypad button{min-height:46px;border:1px solid var(--border);border-radius:11px;background:#17283a;color:white;font-size:21px;font-weight:800}
+.ip-keypad button:active{background:#244260}
+.ip-keypad .wide-key{grid-column:span 3;min-height:40px;font-size:14px}
+.ip-keypad .wide-key+.wide-key{margin-top:-2px}

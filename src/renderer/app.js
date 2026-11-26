@@ -31,14 +31,14 @@
     },
     speed: {
       title: 'Theo dõi vận tốc của xe',
-      intro: 'Khởi động chuyến đi để xem vận tốc thay đổi theo thời gian và dữ liệu được ghi lại.',
+      intro: 'Đo vận tốc của xe robot khi đi qua các vạch đen cách nhau 10 cm, hoặc xem một chuyến đi mô phỏng.',
       steps: [
-        'Nhấn “Bắt đầu chạy” để bắt đầu chuyến đi; nhấn lần nữa để tạm dừng hoặc tiếp tục.',
-        'Đồng hồ hiển thị vận tốc theo km/h. Mỗi giây, một điểm đo được thêm vào biểu đồ và bảng.',
-        'Theo dõi thời gian, vận tốc và quãng đường tích lũy trong bảng dữ liệu.',
-        'Nhấn “Đặt lại” để xóa dữ liệu và bắt đầu chuyến đi mới.'
+        'Xe thật: bấm “📶 Kết nối xe”, IP đã điền sẵn (sửa bằng bàn phím số nếu cần), bấm “Kết nối”.',
+        'Đặt xe trên mặt bàn trước vạch đầu tiên, bấm “▶ Bắt đầu”. Xe chạy chậm rồi nhanh dần; bấm “■ Dừng” khi xe qua hết các vạch.',
+        'Mỗi khi xe chạm một vạch đen (từ vạch thứ 2), bảng thêm một dòng: Δt giữa hai vạch và v = 0,1 m ÷ Δt (m/s).',
+        'Chưa có xe: bấm “Bắt đầu chạy” để xem chuyến đi mô phỏng (km/h, mỗi giây một điểm). “Đặt lại” để xóa dữ liệu.'
       ],
-      takeaway: 'So sánh vận tốc ở các thời điểm và quan sát quãng đường tích lũy theo thời gian.'
+      takeaway: 'Vận tốc tại mỗi vạch bằng quãng đường 10 cm chia cho thời gian đi giữa hai vạch; quan sát vận tốc tăng dần khi xe nhanh dần.'
     },
     future: {
       title: 'Bài học mới',

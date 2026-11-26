@@ -131,12 +131,7 @@
       if (!record) return;
       let added = false;
       if (Array.isArray(data.events)) {
-        for (const event of data.events) {
-          if (!(event.seq > state.carLastSeq)) continue;
-          state.carLastSeq = event.seq;
-          state.samples.push({ t: Number(event.t_s), v: Number(event.speed_mps), line: event.line, dt: Number(event.interval_s) });
-          added = true;
-        }
+        added = addCarEvents(data.events);
       } else if (data.running) {
         // Firmware cũ (không có danh sách lần đo): lấy mẫu mỗi giây như trước.
         const previous = state.samples[state.samples.length - 1];
@@ -152,6 +147,30 @@
       }
     }
 
+    function addCarEvents(list) {
+      let added = false;
+      for (const event of list) {
+        if (!(event.seq > state.carLastSeq)) continue;
+        state.carLastSeq = event.seq;
+        state.samples.push({ t: Number(event.t_s), v: Number(event.speed_mps), line: event.line, dt: Number(event.interval_s) });
+        added = true;
+      }
+      return added;
+    }
+
+    // Xe gửi ngay qua UDP khi đo xong một vạch. Chỉ nhận gói liền kề số thứ tự đã có;
+    // nếu lỡ mất gói ở giữa, lần hỏi /status kế tiếp sẽ lấy bù đầy đủ.
+    function applyCarPush(event) {
+      if (!state.alive || !state.carConnected || event.boot_id !== state.carBootId) return;
+      if (event.seq !== state.carLastSeq + 1) return;
+      state.realSensorAt = Date.now();
+      addCarEvents([event]);
+      setSpeed(event.speed_mps);
+      if (state.samples.length > 500) state.samples.splice(0, state.samples.length - 500);
+      renderTable();
+      drawChart();
+    }
+
     function showCarUnits() {
       document.querySelector('.gauge-value span').textContent = 'm/s';
       document.querySelector('#speed-head').innerHTML = '<tr><th>Vạch</th><th>Thời điểm (s)</th><th>Δt giữa 2 vạch (s)</th><th>v = 0,1 m ÷ Δt (m/s)</th></tr>';
@@ -164,18 +183,42 @@
       drawChart();
     }
 
+    // IP mặc định của xe trong mạng Wi-Fi "iot"; app nhớ IP kết nối thành công gần nhất.
+    const DEFAULT_CAR_IP = '192.168.137.35';
+    function loadCarIp() {
+      try { return localStorage.getItem('esp32-ip') || DEFAULT_CAR_IP; } catch { return DEFAULT_CAR_IP; }
+    }
+    function saveCarIp(ip) {
+      try { localStorage.setItem('esp32-ip', ip); } catch { /* bỏ qua */ }
+    }
+
     function showConnectDialog() {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay esp32-overlay';
       overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
         <div class="modal-head"><div><h2>Kết nối xe ESP32</h2><p>Pi và xe phải kết nối cùng mạng WiFi.</p></div><button class="icon-btn" data-close>×</button></div>
-        <label>Địa chỉ IP của xe<input id="esp32-ip" value="192.168.1.50" inputmode="url" autocomplete="off"></label>
-        <div class="code-hint"><code>GET /status</code> · <code>POST /start</code> · <code>POST /stop</code></div>
+        <label>Địa chỉ IP của xe<input id="esp32-ip" value="${loadCarIp()}" inputmode="decimal" autocomplete="off"></label>
+        <div class="ip-keypad" aria-label="Bàn phím số">
+          ${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0'].map((key) => `<button type="button" data-key="${key}">${key}</button>`).join('')}
+          <button type="button" data-key="back" aria-label="Xóa một ký tự">⌫</button>
+          <button type="button" class="wide-key" data-key="clear">Xóa hết</button>
+          <button type="button" class="wide-key" data-key="default">Mặc định ${DEFAULT_CAR_IP}</button>
+        </div>
         <p class="esp32-error" role="alert"></p>
         <button class="primary wide" id="esp32-submit">Kết nối</button>
       </div>`;
       document.body.appendChild(overlay);
       const input = overlay.querySelector('#esp32-ip');
+      // Bàn phím số trên màn hình cảm ứng (Pi không có bàn phím thật).
+      overlay.querySelector('.ip-keypad').addEventListener('click', (event) => {
+        const key = event.target.closest('[data-key]')?.dataset.key;
+        if (!key) return;
+        if (key === 'back') input.value = input.value.slice(0, -1);
+        else if (key === 'clear') input.value = '';
+        else if (key === 'default') input.value = DEFAULT_CAR_IP;
+        else if (input.value.length < 15) input.value += key;
+        overlay.querySelector('.esp32-error').textContent = '';
+      });
       const submit = overlay.querySelector('#esp32-submit');
       const error = overlay.querySelector('.esp32-error');
       const close = () => overlay.remove();
@@ -191,6 +234,7 @@
           return;
         }
         state.carConnected = true;
+        saveCarIp(input.value.trim());
         document.querySelector('#esp32-connect').textContent = `● ${result.address.replace(/^https?:\/\//, '')}`;
         document.querySelector('#esp32-connect').classList.add('connected');
         document.querySelector('#trip-toggle').hidden = true;
@@ -206,7 +250,6 @@
       overlay.addEventListener('click', (event) => { if (event.target === overlay) close(); });
       submit.addEventListener('click', connect);
       input.addEventListener('keydown', (event) => { if (event.key === 'Enter') connect(); });
-      input.select();
     }
 
     async function sendCarCommand(command) {
@@ -241,6 +284,7 @@
       document.querySelector('#left-signal').classList.toggle('on', state.signal === 1);
       document.querySelector('#right-signal').classList.toggle('on', state.signal === 2);
     });
+    const unsubscribePush = window.physicsBridge.onEsp32Event?.(applyCarPush);
     const unsubscribe = window.physicsBridge.onSensorData((data) => {
       if (!state.alive || data?.type !== 'speed') return;
       state.realSensorAt = Date.now(); setSpeed(data.value);
@@ -267,6 +311,7 @@
       clearInterval(carInterval);
       window.removeEventListener('resize', resize);
       if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof unsubscribePush === 'function') unsubscribePush();
     };
   }
   window.SpeedLesson = { mount };

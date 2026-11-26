@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('physicsBridge', {
   getEsp32Status: (since) => ipcRenderer.invoke('esp32:status', since),
   sendEsp32Command: (command) => ipcRenderer.invoke('esp32:command', command),
   disconnectEsp32: () => ipcRenderer.invoke('esp32:disconnect'),
+  onEsp32Event: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('esp32:event', listener);
+    return () => ipcRenderer.removeListener('esp32:event', listener);
+  },
   onSensorData: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('sensor:data', listener);
