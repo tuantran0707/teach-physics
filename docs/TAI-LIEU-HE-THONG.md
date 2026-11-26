@@ -1,6 +1,6 @@
 # Tài liệu hệ thống Phòng thí nghiệm Vật lý tương tác
 
-Tài liệu mô tả toàn bộ thiết bị: phần cứng, phần mềm, giao thức truyền dữ liệu, giải thuật, cách cài đặt, vận hành và bảo trì. Nội dung được lập theo mã nguồn và cấu hình thiết bị ngày 24/11/2026, cập nhật ngày 25/11/2026.
+Tài liệu mô tả toàn bộ thiết bị: phần cứng, phần mềm, giao thức truyền dữ liệu, giải thuật, cách cài đặt, vận hành và bảo trì. Nội dung được lập theo mã nguồn và cấu hình thiết bị ngày 24/11/2026, cập nhật ngày 26/11/2026.
 
 ## Mục lục
 
@@ -54,7 +54,7 @@ Thành phần chính:
 | Khối âm thanh | Loa (jack 3,5 mm) | Phát bài hát và giọng đọc câu hỏi |
 | Khối đo lực | FSR402, ESP32 (1) | Đo lực ấn 0–60 N, gửi qua UART |
 | Khối xe đo vận tốc | Cảm biến dò line, ESP32 (2), L298N, 2 động cơ DC, pin | Đo thời gian qua các vạch đen cách nhau 10 cm, tính vận tốc |
-| Khối truyền thông | Router Wi-Fi | Mạng cục bộ giữa Pi và xe; không cần Internet khi học |
+| Khối truyền thông | Điểm phát Wi-Fi `iot` (mạng 192.168.137.x) | Mạng cục bộ giữa Pi và xe; không cần Internet khi học |
 
 ---
 
@@ -112,20 +112,44 @@ Lưu ý:
 - Không dùng GPIO4 cho tín hiệu analog: GPIO4 thuộc ADC2, không đọc được ổn định khi Wi-Fi bật.
 - Tháo jumper ENA/ENB trên L298N để ESP32 điều khiển PWM.
 - Động cơ dùng nguồn pin riêng, không lấy từ chân 3V3 của ESP32.
-- Đường đo gồm các vạch đen ngang cách nhau **10 cm**, rộng 1,5–2 cm. Xe chạy thẳng dọc dãy vạch; một cảm biến không tự lái theo đường cong.
+- Đường đo gồm các vạch băng keo đen ngang cách nhau **10 cm**, rộng 1,5–2 cm, dán trên mặt bàn sáng màu. Xe chạy thẳng dọc dãy vạch; một cảm biến không tự lái theo đường cong.
+- Cảm biến hiện cách mặt bàn khoảng 1 cm, không hạ thấp hơn được. Ở độ cao này băng đen chỉ cao hơn mặt bàn khoảng 130–170 đơn vị ADC, nên ngưỡng phải đặt theo số đo thực tế (mục 10.2).
 - Xe không có encoder, vận tốc thực phụ thuộc pin và mặt sàn. Đó là lý do vận tốc được đo bằng vạch.
 
-Thông tin Wi-Fi và ngưỡng cảm biến đặt trong `robot_config.h` (cạnh file `.ino`, không đưa lên Git):
+Thông số đang dùng (ngày 26/11/2026):
+
+| Nhóm | Thông số | Giá trị |
+|---|---|---|
+| Wi-Fi | Tên mạng | `iot` |
+| Cảm biến | Chân, kiểu đọc | GPIO34, analog 12 bit |
+| | Ngưỡng ± vùng đệm | 85 ± 30: ADC > 115 là đen, ADC < 55 là trắng |
+| | Chiều vạch đen | ADC cao hơn ngưỡng |
+| | Không thấy mặt sàn | ADC > 1 500 (xe bị nhấc lên, ra ngoài mép bàn): không tính là vạch |
+| Động cơ | PWM lúc bắt đầu → PWM tối đa | 60 → 160, tăng đều trong 8 s |
+| Đo | Khoảng cách vạch | 0,10 m |
+| | Khoảng cách tối thiểu giữa hai vạch | 40 ms (nhỏ hơn thì bỏ qua) |
+| Dừng xe | | Chỉ khi bấm Dừng, hoặc khi mất Wi-Fi |
+
+Ngưỡng cảm biến và thông số động cơ chỉnh được qua trang web của xe, lưu trong bộ nhớ flash (NVS) của ESP32, không cần nạp lại firmware (mục 10.2, 10.3). Nạp lại firmware không xóa các giá trị này.
+
+Giá trị mặc định khi nạp firmware đặt trong `robot_config.h` (cạnh file `.ino`, không đưa lên Git vì chứa mật khẩu Wi-Fi):
 
 ```c
 #pragma once
-#define WIFI_SSID "ten-wifi"
-#define WIFI_PASSWORD "mat-khau"
+#define WIFI_SSID "iot"
+#define WIFI_PASSWORD "mat-khau-wifi"
+
 #define LINE_SENSOR_PIN 34
 #define LINE_SENSOR_ANALOG 1
-#define LINE_SENSOR_THRESHOLD 1800
-#define LINE_BLACK_BELOW_THRESHOLD 1
-#define LINE_DIGITAL_BLACK_LOW 1
+#define LINE_SENSOR_THRESHOLD 85
+#define LINE_SENSOR_HYSTERESIS 30
+#define LINE_SENSOR_FLOOR_MAX 1500
+#define LINE_BLACK_BELOW_THRESHOLD 0   // 0: vạch đen cho ADC cao hơn ngưỡng
+#define LINE_DIGITAL_BLACK_LOW 0
+
+#define PWM_MIN 60
+#define PWM_MAX 160
+#define ACCELERATION_MS 8000
 ```
 
 ---
@@ -136,9 +160,11 @@ Thông tin Wi-Fi và ngưỡng cảm biến đặt trong `robot_config.h` (cạn
 |---|---|---|---|
 | ESP32 (1) → Pi | UART qua USB, 115200 baud, mỗi dòng một giá trị | `value:32.50N` | 200 ms |
 | Pi → ESP32 (2) | HTTP, cổng 80 | `POST /start`, `/stop`, `/reset` | Theo thao tác |
-| ESP32 (2) → Pi | HTTP, cổng 80 | `GET /status?since=n`, phản hồi JSON | Pi hỏi mỗi 300 ms |
+| ESP32 (2) → Pi | UDP, cổng 4210 trên Pi | Một gói JSON cho mỗi vạch đo được | Ngay khi qua vạch |
+| ESP32 (2) → Pi | HTTP, cổng 80 | `GET /status?since=n`, phản hồi JSON (dự phòng khi mất gói UDP) | Pi hỏi mỗi 300 ms |
+| ESP32 (2) → trình duyệt | HTTP, cổng 80 | Log, chẩn đoán, hiệu chuẩn (`/logs`, `/diag`, `/config`, `/motor`) | Theo yêu cầu |
 | Cảm biến → ESP32 (2) | Analog GPIO34, ADC 12 bit | Mức đen/trắng | 1 ms |
-| ESP32 (2) → L298N | PWM 2 kHz, 8 bit | Độ rộng xung 160–255 | 20 ms |
+| ESP32 (2) → L298N | PWM 2 kHz, 8 bit | Độ rộng xung 60–160 | 20 ms |
 
 ### 4.1. Cổng nối tiếp
 
@@ -160,14 +186,21 @@ Dòng không đúng định dạng được báo trên giao diện, không làm 
 | `POST /stop` | Dừng động cơ, giữ số liệu |
 | `POST /reset` | Dừng động cơ, xóa số vạch |
 | `GET /status?since=n` | Trạng thái xe và các số đo có số thứ tự lớn hơn `n` |
-| `GET /` | Trang điều khiển mở được bằng điện thoại hoặc laptop cùng Wi-Fi |
+| `GET /status?since=n&udp=4210` | Như trên, đồng thời đăng ký máy gửi yêu cầu nhận số đo qua UDP ở cổng 4210 |
+| `GET /` | Trang điều khiển: nút Bắt đầu/Dừng/Đặt lại, bảng vạch, giá trị cảm biến, khung hiệu chuẩn và tăng tốc |
+| `GET /logs` | Trang xem log trực tiếp (mục 10.4) |
+| `GET /log?since=n`, `GET /log.json?since=n` | Log dạng văn bản và JSON |
+| `GET /diag` | Chẩn đoán: lý do khởi động, RAM, Wi-Fi, cấu hình và giá trị cảm biến |
+| `GET /config?threshold=&hysteresis=&floor=&black=` | Đọc hoặc đổi cấu hình cảm biến, lưu vào flash |
+| `GET /motor?pwm_min=&pwm_max=&accel_ms=` | Đọc hoặc đổi thông số động cơ, lưu vào flash |
+| `POST /reboot` | Khởi động lại ESP32 |
 
 Ví dụ phản hồi `/status`:
 
 ```json
 {"type":"speed","boot_id":184467,"seq":3,"value":1.237,"unit":"km/h","speed_mps":0.3436,
- "distance_m":0.40,"line_count":4,"line_spacing_m":0.100,"elapsed_s":1.62,"pwm":205,
- "running":true,"stop_reason":"","sensor_raw":3120,"on_line":false,
+ "distance_m":0.40,"line_count":4,"line_spacing_m":0.100,"elapsed_s":1.62,"pwm":110,
+ "running":true,"stop_reason":"","sensor_raw":18,"on_line":false,"log_seq":152,
  "events":[
   {"seq":2,"line":3,"t_s":1.181,"interval_s":0.3740,"speed_mps":0.2674,"speed_kmh":0.963},
   {"seq":3,"line":4,"t_s":1.472,"interval_s":0.2910,"speed_mps":0.3436,"speed_kmh":1.237}]}
@@ -179,6 +212,22 @@ Ví dụ phản hồi `/status`:
 - Vận tốc được tính trên ESP32 tại thời điểm qua vạch, độ trễ mạng không ảnh hưởng kết quả.
 
 Vì lý do an toàn, ứng dụng chỉ kết nối tới địa chỉ IP nội bộ (`10.x`, `172.16–31.x`, `192.168.x`, `169.254.x`) hoặc tên `.local`, và chờ tối đa 4 s cho mỗi yêu cầu.
+
+### 4.3. Gửi ngay số đo qua UDP
+
+Để vận tốc hiện lên ngay khi xe chạm vạch, không phải chờ lần hỏi kế tiếp (tới 300 ms):
+
+1. Khi kết nối, Pi gọi `/status?since=0&udp=4210`. Xe ghi nhớ IP của Pi và cổng 4210, ghi log "Gửi ngay số đo vận tốc qua UDP tới …".
+2. Mỗi khi đo xong một vạch, xe gửi ngay một gói UDP tới Pi:
+
+   ```json
+   {"type":"speed_event","boot_id":184467,"seq":3,"line":4,"t_s":1.472,"interval_s":0.2910,"speed_mps":0.3436,"speed_kmh":1.237}
+   ```
+
+3. Pi (`main.js`) nhận gói ở cổng 4210, chỉ chấp nhận gói đến từ đúng IP của xe, rồi chuyển cho Bài 3 qua kênh IPC `esp32:event`.
+4. Bài 3 chỉ nhận gói có `seq` bằng số thứ tự cuối cùng + 1. Nếu một gói bị mất, lần hỏi `/status?since=n` kế tiếp lấy bù đủ, nên không bỏ sót vạch nào.
+
+UDP không cần thêm thư viện: ESP32 dùng `WiFiUdp`, Pi dùng module `dgram` có sẵn trong Node.js. Trên Windows, tường lửa phải cho phép `electron.exe` nhận UDP; trên Raspberry Pi OS mặc định không chặn.
 
 ---
 
@@ -218,7 +267,7 @@ API dùng trong giao diện (có sẵn trong Chromium):
 | Web Audio API | Tiếng gieo xúc xắc |
 | Web Speech API | Giọng đọc dự phòng khi thiếu file MP3 |
 
-API dùng trong tiến trình chính (Node.js): `child_process` (gọi `stty`), `fs` (đọc cổng nối tiếp), `fetch` (gọi HTTP tới xe), IPC của Electron (`ipcMain`, `contextBridge`).
+API dùng trong tiến trình chính (Node.js): `child_process` (gọi `stty`), `fs` (đọc cổng nối tiếp), `fetch` (gọi HTTP tới xe), `dgram` (nhận UDP từ xe), IPC của Electron (`ipcMain`, `contextBridge`). Giao diện dùng thêm `localStorage` để nhớ IP xe kết nối gần nhất.
 
 ### 5.3. Firmware ESP32
 
@@ -227,7 +276,7 @@ API dùng trong tiến trình chính (Node.js): `child_process` (gọi `stty`), 
 | Arduino IDE | 2.3.8 | Soạn, biên dịch và nạp firmware |
 | arduino-cli | 1.4.1 | Biên dịch bằng dòng lệnh, đi kèm Arduino IDE |
 | Board package *esp32 by Espressif Systems* | 3.3.10 | Lõi Arduino cho ESP32, xây dựng trên ESP-IDF và hệ điều hành thời gian thực FreeRTOS |
-| Thư viện | Có sẵn trong board package | `WiFi`, `WebServer` (HTTP server), `esp_timer` (đồng hồ micro giây), `esp_random`; FreeRTOS cho tác vụ đọc cảm biến 1 ms (`xTaskCreatePinnedToCore`). Không cần cài thêm thư viện ngoài |
+| Thư viện | Có sẵn trong board package | `WiFi`, `WebServer` (HTTP server), `WiFiUdp` (gửi số đo qua UDP), `Preferences` (lưu cấu hình vào flash NVS), `esp_timer` (đồng hồ micro giây), `esp_random`, `esp_system` (lý do khởi động lại); FreeRTOS cho tác vụ đọc cảm biến 1 ms (`xTaskCreatePinnedToCore`) và hàng đợi (`xQueue`) chuyển sự kiện cảm biến sang vòng lặp chính để ghi log. Không cần cài thêm thư viện ngoài |
 
 ### 5.4. Hệ điều hành và dịch vụ trên Raspberry Pi
 
@@ -290,7 +339,8 @@ teach-physics/
 │   ├── start-electron.js        Khởi chạy Electron (npm start)
 │   ├── smoke-electron.js        Kiểm thử nhanh (npm run smoke)
 │   └── generate-voice.js        Tạo giọng đọc (npm run voice)
-├── arduino/esp32_line_robot/    Firmware xe
+├── arduino/esp32_line_robot/    Firmware xe: esp32_line_robot.ino, speed_event.h, README.md
+│                                (robot_config.h tự tạo, không đưa lên Git)
 ├── touch-esp32/fsr402_uart/     Firmware cảm biến lực
 ├── deploy/                      File autostart mẫu
 └── docs/                        Tài liệu và hình vẽ (so-do/)
@@ -314,6 +364,7 @@ Các kênh IPC:
 | `sensor:data` | Chính → giao diện | `{ type: 'force', value }` |
 | `sensor:connection`, `sensor:error`, `sensor:warning` | Chính → giao diện | Trạng thái và lỗi cổng nối tiếp |
 | `esp32:connect`, `esp32:status`, `esp32:command`, `esp32:disconnect` | Giao diện → chính | Kết nối, đọc trạng thái, gửi lệnh tới xe |
+| `esp32:event` | Chính → giao diện | Số đo một vạch, nhận qua UDP |
 
 ### 6.3. Chế độ nhẹ
 
@@ -365,21 +416,45 @@ Mô hình: vật có trọng lực P = 50 N, phản lực N = 50 N, lực ma sá
 Hai chế độ:
 
 - **Mô phỏng** (chưa kết nối xe): một hành trình mẫu tăng tốc, chạy đều rồi giảm tốc, mỗi giây một điểm, đơn vị km/h.
-- **Xe thật**: nhấn **📶 Kết nối xe**, nhập IP của xe, rồi **▶ Bắt đầu**. Đồng hồ, đồ thị và bảng chuyển sang m/s. Mỗi dòng bảng là một vạch: Vạch, Thời điểm t, Δt giữa hai vạch, v = 0,1 m ÷ Δt. Trục đồ thị tự co giãn theo vận tốc lớn nhất.
+- **Xe thật**: nhấn **📶 Kết nối xe**. Ô IP điền sẵn `192.168.137.35` (hoặc IP kết nối thành công gần nhất); nếu cần sửa, dùng **bàn phím số trên màn hình** trong hộp thoại (0–9, dấu chấm, ⌫, Xóa hết, Mặc định). Bấm **Kết nối**, rồi **▶ Bắt đầu**. Đồng hồ, đồ thị và bảng chuyển sang m/s. Mỗi dòng bảng là một vạch: Vạch, Thời điểm t, Δt giữa hai vạch, v = 0,1 m ÷ Δt. Trục đồ thị tự co giãn theo vận tốc lớn nhất.
 
-Nguyên lý đo: xe qua vạch thứ nhất thì bắt đầu tính giờ. Từ vạch thứ hai, mỗi vạch cho một số đo v = 0,10 m ÷ Δt, là vận tốc trung bình trên đoạn 10 cm vừa đi, xấp xỉ vận tốc tức thời tại vạch. Ví dụ xe qua vạch 3 lúc 1,181 s và vạch 4 lúc 1,472 s: Δt = 0,291 s, v ≈ 0,344 m/s.
+Nguyên lý đo: xe qua vạch thứ nhất thì bắt đầu tính giờ. Từ vạch thứ hai, mỗi vạch cho một số đo v = 0,10 m ÷ Δt, là vận tốc trung bình trên đoạn 10 cm vừa đi, xấp xỉ vận tốc tức thời tại vạch. Số đo được gửi ngay qua UDP nên hiện trên màn hình gần như cùng lúc xe chạm vạch (mục 4.3).
 
-Xe tự dừng khi quá 4 s không gặp vạch (chạy hết đường hoặc lệch khỏi dãy vạch), hoặc khi mất Wi-Fi.
+Chuyển động của xe:
+
+- Xe **chỉ chạy khi bấm Bắt đầu và chỉ dừng khi bấm Dừng**; không tự dừng khi hết vạch. Chỉ khi mất Wi-Fi xe mới tự dừng để an toàn, vì lúc đó Pi không gửi được lệnh Dừng.
+- Xe **chạy chậm rồi nhanh dần đều**: PWM tăng tuyến tính từ 60 lên 160 trong 8 s rồi giữ nguyên. Ở PWM thấp, động cơ cần 1–3 s mới đủ lực để lăn; việc tính giờ bắt đầu từ vạch đầu tiên nên không ảnh hưởng phép đo.
+
+Kết quả một lần chạy thật (26/11/2026, ngưỡng 85 ± 30):
+
+| Vạch | t (s) | Δt (s) | v (m/s) |
+|---|---|---|---|
+| 2 | 0,856 | 0,267 | 0,375 |
+| 3 | 1,086 | 0,230 | 0,435 |
+| 4 | 1,296 | 0,210 | 0,476 |
+
+Vận tốc tăng đều qua từng vạch, phù hợp với chuyển động nhanh dần.
 
 ![Hình 3. Lưu đồ tác vụ đọc cảm biến dò line](so-do/hinh-3-luu-do-doc-cam-bien-do-line.png)
 
 *Hình 3. Lưu đồ tác vụ đọc cảm biến dò line*
 
-Tác vụ này chạy riêng mỗi 1 ms với mức ưu tiên cao hơn web server, nên việc Pi hỏi dữ liệu không làm lệch thời điểm qua vạch. Một vạch được xác nhận khi đọc 3 mẫu đen liên tiếp; xe ra khỏi vạch khi đọc 5 mẫu trắng liên tiếp. Thời điểm qua vạch lấy từ mẫu đen đầu tiên, đo bằng đồng hồ micro giây.
+Tác vụ này chạy riêng mỗi 1 ms với mức ưu tiên cao hơn web server, nên việc Pi hỏi dữ liệu không làm lệch thời điểm qua vạch. Mỗi mẫu ADC được phân loại:
+
+| Điều kiện | Kết quả |
+|---|---|
+| ADC > 1 500 | Trắng: cảm biến không thấy mặt sàn (xe bị nhấc lên, ra ngoài mép bàn), không tính là vạch |
+| ADC > ngưỡng + vùng đệm (115) | Đen |
+| ADC < ngưỡng − vùng đệm (55) | Trắng |
+| Ở giữa (55–115) | Vùng đệm: giữ trạng thái cũ, chống nhấp nháy ở mép băng keo |
+
+Một vạch được xác nhận khi đọc 3 mẫu đen liên tiếp; xe ra khỏi vạch khi đọc 5 mẫu trắng liên tiếp. Thời điểm qua vạch lấy từ mẫu đen đầu tiên, đo bằng đồng hồ micro giây. Hai vạch cách nhau dưới 40 ms bị bỏ qua (thường là một vạch bị đếm hai lần ở mép).
 
 ![Hình 4. Lưu đồ chương trình chính của xe](so-do/hinh-4-luu-do-chuong-trinh-chinh-xe.png)
 
 *Hình 4. Lưu đồ chương trình chính của xe*
+
+Trong công thức của Hình 4: PWM₀ là PWM lúc bắt đầu (60), PWM₁ là PWM tối đa (160), T là thời gian tăng tốc (8 s), t là thời gian từ lúc bấm Bắt đầu.
 
 ![Hình 5. Lưu đồ nhận số đo vận tốc trên Raspberry Pi](so-do/hinh-5-luu-do-bai-3-nhan-so-do-van-toc.png)
 
@@ -409,7 +484,28 @@ Cấu hình đang áp dụng trên Pi:
 | Tắt màn hình khi không chạm | Sau 10 phút (`swayidle` trong `~/.config/labwc/autostart`) | Xóa dòng `swayidle` để màn hình luôn sáng |
 | SSH | Bật | Dùng để cập nhật mã nguồn từ máy tính |
 
-Tắt hẳn ứng dụng: chạm biểu tượng thoát nếu có, hoặc qua SSH chạy `pkill -f teach-physics/node_modules/electron`. Khởi động lại Pi thì ứng dụng tự mở lại.
+Tắt hẳn ứng dụng: chạm biểu tượng thoát nếu có, hoặc qua SSH chạy `pkill -f teach-physics/node_modules/electron`. Khởi động lại Pi thì ứng dụng tự mở lại. Khi mở lại ứng dụng bằng tay qua SSH, kiểm tra không còn bản cũ chạy song song: `pgrep -fa 'dist/electron \.'` chỉ được ra một dòng.
+
+### Mạng Wi-Fi khi sử dụng
+
+| Thiết bị | Mạng | Địa chỉ IP (26/11/2026) |
+|---|---|---|
+| Điểm phát Wi-Fi | `iot` | 192.168.137.1 |
+| Raspberry Pi | `iot` | 192.168.137.218 |
+| Xe ESP32 (2) | `iot` | 192.168.137.35 |
+| Laptop (khi cần cập nhật hoặc đọc log) | `iot` | do điểm phát cấp |
+
+Các địa chỉ do điểm phát cấp tự động (DHCP) nên có thể đổi khi đổi điểm phát. Cách tìm lại:
+
+- IP của xe: dòng log "Wi-Fi: nhận IP …" trong Serial Monitor (cắm USB, 115200 baud) hoặc trang quản trị điểm phát.
+- IP của Pi: `hostname -I` trên Pi, hoặc trang quản trị điểm phát (Raspberry Pi có địa chỉ MAC bắt đầu bằng `b8:27:eb`).
+
+Trình tự một buổi học dùng xe:
+
+1. Bật điểm phát Wi-Fi `iot`, bật Pi, chờ ứng dụng mở.
+2. Bật nguồn xe, chờ khoảng 5 s để xe vào Wi-Fi.
+3. Trên Pi: **Bài 3 → 📶 Kết nối xe → Kết nối** (IP điền sẵn).
+4. Đặt cảm biến xe trên mặt bàn, trước vạch đầu tiên 3–5 cm. Bấm **▶ Bắt đầu**, chờ xe tự lăn, bấm **■ Dừng** khi xe qua hết các vạch.
 
 ---
 
@@ -468,7 +564,7 @@ WinSCP là phần mềm miễn phí trên Windows, chép file qua giao thức SF
 | Trường | Giá trị |
 |---|---|
 | File protocol | SFTP |
-| Host name | IP của Pi, ví dụ `192.168.1.x` |
+| Host name | IP của Pi, hiện là `192.168.137.218` (mạng `iot`) |
 | Port number | 22 |
 | User name | `pap` |
 | Password | Mật khẩu của user `pap` |
@@ -574,9 +670,20 @@ Với sửa đổi nhỏ trong một file văn bản, có thể dùng **Screen s
 ### 9.6. Nạp firmware ESP32
 
 1. Cài Arduino IDE và board **esp32 by Espressif Systems** (đã thử với bản 3.3.10).
-2. Với xe: tạo `robot_config.h` như mục 3.3.
-3. Chọn board **ESP32 Dev Module**, chọn cổng COM, nạp sketch.
-4. Mở Serial Monitor 115200 baud: xe in địa chỉ IP sau khi vào Wi-Fi; cảm biến lực in các dòng `value:...N`.
+2. Với xe: tạo `robot_config.h` như mục 3.3. Đổi tên Wi-Fi hoặc mật khẩu cũng sửa ở file này rồi nạp lại.
+3. Chọn board **ESP32 Dev Module**, chọn cổng COM của xe, nạp sketch.
+4. Mở Serial Monitor 115200 baud: xe in log khởi động, trong đó có dòng "Wi-Fi: nhận IP …"; cảm biến lực in các dòng `value:...N`.
+
+Nạp bằng dòng lệnh (arduino-cli đi kèm Arduino IDE), trong thư mục `arduino/esp32_line_robot`:
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 .
+arduino-cli upload  --fqbn esp32:esp32:esp32 -p COM17 .
+```
+
+Nạp lại firmware không xóa ngưỡng cảm biến và thông số động cơ đã chỉnh qua web (lưu trong vùng NVS). Cấu hình cảm biến đã lưu tự bị bỏ qua nếu đổi chân hoặc kiểu đọc cảm biến trong `robot_config.h`.
+
+Khi viết thêm hàm trong file `.ino` có tham số kiểu tự định nghĩa (struct, enum), khai báo kiểu đó trong file header riêng (như `speed_event.h`). Arduino IDE tự sinh khai báo hàm lên đầu file, đứng trước kiểu nếu kiểu nằm trong `.ino`, gây lỗi "does not name a type".
 
 ---
 
@@ -600,21 +707,63 @@ Nếu thiếu file MP3, ứng dụng thử giọng đọc của hệ điều hà
 
 ### 10.2. Hiệu chuẩn cảm biến dò line
 
-1. Mở `http://<ip-xe>/` bằng điện thoại cùng Wi-Fi.
-2. Đặt cảm biến lên nền trắng, rồi lên vạch đen, ghi giá trị **Cảm biến ADC**.
-3. Đặt `LINE_SENSOR_THRESHOLD` ở giữa hai giá trị. Nếu vạch đen cho giá trị cao hơn nền trắng, đặt `LINE_BLACK_BELOW_THRESHOLD` = `0`.
-4. Nạp lại firmware (mục 9.6).
+Không cần nạp lại firmware: mọi thông số chỉnh qua web và lưu vào flash.
 
-Các tham số khác (khoảng cách vạch, số mẫu xác nhận, thời gian tự dừng, PWM) được liệt kê trong README của xe và có thể ghi đè trong `robot_config.h`.
+1. Mở `http://<ip-xe>/` trên điện thoại hoặc laptop cùng Wi-Fi, mở khung **Hiệu chuẩn cảm biến**.
+2. Đọc dòng **Cảm biến** khi đặt xe trên mặt bàn và khi đặt trên vạch băng đen. Đo **ngay trên đường chạy**, không nhấc xe; tốt nhất xem log lúc xe chạy thật (mục 10.4), vì giá trị lúc xe chạy mới là giá trị dùng để đo.
+3. Đặt **Ngưỡng** ở giữa hai giá trị, **Vùng đệm** khoảng 1/4 khoảng cách giữa hai giá trị, **Vạch đen cho giá trị**: *cao hơn ngưỡng* (với cảm biến hiện tại). Bấm **Lưu**.
 
-### 10.3. Thêm bài học mới
+Hoặc gọi trực tiếp: `http://<ip-xe>/config?threshold=85&hysteresis=30&floor=1500&black=high`.
+
+Số đo ngày 26/11/2026 và ngưỡng chọn:
+
+| Tình huống | ADC |
+|---|---|
+| Mặt bàn, lúc xe chạy | 16–30 |
+| Băng đen, lúc xe chạy (khi vào vạch) | 145–191 |
+| Xe đứng yên, bị nhấc lên, ở mép bàn | 400–4 095 |
+| **Ngưỡng chọn** | **85 ± 30** (đen > 115, trắng < 55), không thấy mặt sàn khi > 1 500 |
+
+Lưu ý khi cảm biến cách mặt bàn khoảng 1 cm: mức ADC trôi theo ánh sáng phòng, độ nghiêng của xe và vị trí trên bàn (có lần mặt bàn đo được tới 215, băng đen chỉ 130). Khi đổi phòng học hoặc đổi bàn, kiểm tra lại ngưỡng. Nếu log báo nhiều lần "Bỏ qua vạch" hoặc "Ra khỏi vạch sau 9–16 ms", tín hiệu đang nhấp nháy ở mép băng keo: tăng vùng đệm.
+
+### 10.3. Chỉnh tốc độ xe
+
+Trên trang `http://<ip-xe>/`, khung **Tăng tốc của xe**: PWM lúc bắt đầu, PWM tối đa, thời gian tăng (ms). Bấm **Lưu**. Hoặc gọi `http://<ip-xe>/motor?pwm_min=60&pwm_max=160&accel_ms=8000`.
+
+- Xe chạy quá nhanh, khó đọc số: giảm PWM tối đa.
+- Xe đứng quá lâu mới lăn: tăng PWM lúc bắt đầu (động cơ thường cần khoảng 90–100 mới lăn) hoặc rút ngắn thời gian tăng.
+- PWM lúc bắt đầu 160 làm xe qua 7 vạch trong chưa tới 1 s (khoảng 0,6–1,6 m/s), quá nhanh để quan sát; mức 60 → 160 trong 8 s cho vận tốc khoảng 0,4–0,5 m/s ở những vạch đầu.
+
+### 10.4. Đọc log của xe qua Wi-Fi
+
+Không cần cắm dây UART. Firmware ghi mọi sự kiện vào bộ đệm 250 dòng trong RAM (đồng thời in ra Serial 115200 baud); log lúc khởi động, trước khi có Wi-Fi, vẫn được giữ.
+
+- `http://<ip-xe>/logs`: xem log trực tiếp, cập nhật mỗi giây; tạm dừng, ẩn/hiện chi tiết cảm biến, tải file log, khởi động lại ESP32. Dòng đầu trang tóm tắt IP, Wi-Fi, lý do khởi động, RAM và giá trị cảm biến.
+- `http://<ip-xe>/log` (văn bản), `/log.json?since=n` (JSON), `/diag` (chẩn đoán).
+
+Mức log: `I` thông tin, `W` cảnh báo, `E` lỗi, `D` chi tiết cảm biến. Những dòng hay dùng khi tìm lỗi:
+
+| Dòng log | Ý nghĩa |
+|---|---|
+| `Khởi động firmware …, lý do: sụt áp (brownout)` | ESP32 vừa khởi động lại vì nguồn yếu, thường do động cơ kéo sụt nguồn |
+| `Wi-Fi: mất kết nối, mã 201/202/15 …` | Sai tên mạng, sai mật khẩu hoặc ngoài vùng phủ sóng |
+| `Gửi ngay số đo vận tốc qua UDP tới …` | Pi đã đăng ký nhận UDP |
+| `Bắt đầu chạy (HTTP …): PWM …, cảm biến đang thấy …` | Lệnh Bắt đầu, kèm trạng thái cảm biến lúc xuất phát |
+| `Vạch N: t=…, Δt=…, v=…` | Một số đo vận tốc |
+| `Bỏ qua vạch: chỉ cách vạch trước … ms` | Một vạch bị đếm hai lần, đã được lọc |
+| `D Vào vạch / Ra khỏi vạch sau … ms, ADC=…` | Giá trị ADC ở mép vạch, dùng để chỉnh ngưỡng |
+| `Cảm biến không thấy mặt sàn trong … ms` | ADC > 1 500: xe bị nhấc lên hoặc ra ngoài mép bàn |
+| `Đang chạy / Đứng yên: … ADC a–b, nhiễu …` | Tóm tắt mỗi 2 s khi chạy, 15 s khi đứng yên: khoảng ADC nhỏ nhất–lớn nhất |
+| `Dừng xe: lệnh dừng / mất Wi-Fi. Đã qua N vạch …` | Lý do dừng và tổng kết lần chạy |
+
+### 10.5. Thêm bài học mới
 
 1. Tạo `src/renderer/lessons/<ten-bai>.js` theo mẫu các bài hiện có: một hàm `mount()` dựng giao diện bằng `window.ui.lessonShell(...)` và trả về hàm dọn dẹp (xóa timer, bỏ đăng ký sự kiện).
 2. Thêm thẻ `<script>` vào `index.html`.
 3. Thêm bài vào mảng `lessons` và `lessonGuides` trong `app.js`, rồi gọi `mount()` trong `openLesson()`.
 4. Nếu bài dùng thiết bị mới, thêm kênh IPC trong `main.js` và hàm tương ứng trong `preload.js`.
 
-### 10.4. Hình vẽ trong tài liệu
+### 10.6. Hình vẽ trong tài liệu
 
 Các hình trong `docs/so-do/` được vẽ theo quy ước lưu đồ: mũi tên đi thẳng hoặc gấp vuông góc, vào chính giữa cạnh của khối kế tiếp; Đ là nhánh đúng, S là nhánh sai. Khi giải thuật thay đổi, cần cập nhật hình tương ứng.
 
@@ -653,27 +802,34 @@ Có thể giảm thêm khoảng 80 MB RAM bằng cách cho autostart chạy th�
 | Không có giọng đọc câu hỏi | Thiếu file MP3 hoặc loa sai ngõ ra | Kiểm tra `assets/voice/`; thử phát bài hát Bài 1; chọn ngõ ra âm thanh trên thanh tác vụ |
 | Bài 2 không nhận lực | Cổng không phải `/dev/ttyUSB0` hoặc cáp lỏng | Nút trạng thái cảm biến trên trang chủ để chọn cổng; kiểm tra `ls /dev/ttyUSB* /dev/ttyACM*` |
 | Lực nhảy hoặc không về 0 | Cảm biến FSR lệch | Chỉnh `ADC_ZERO`, `ADC_SATURATION` trong firmware |
-| Không kết nối được xe | Xe và Pi khác mạng, sai IP | Xem IP trong Serial Monitor hoặc danh sách thiết bị của router; mở `http://<ip-xe>/` để thử |
-| Xe chạy nhưng không có số đo | Ngưỡng cảm biến sai, vạch quá mảnh | Hiệu chuẩn theo mục 10.2; vạch rộng 1,5–2 cm |
-| Xe tự dừng giữa chừng | Quá 4 s không gặp vạch, hoặc mất Wi-Fi | Đặt vạch đều 10 cm; xem `stop_reason` trong `/status` |
+| Không kết nối được xe | Xe chưa bật hoặc chưa vào Wi-Fi; xe và Pi khác mạng; sai IP | Bật xe, chờ 5 s; Pi và xe cùng mạng `iot`; xem IP trong Serial Monitor; mở `http://<ip-xe>/` trên laptop để thử |
+| Không gõ được IP trên Pi | Màn hình cảm ứng không có bàn phím | Dùng bàn phím số trong hộp thoại Kết nối xe; nút **Mặc định** điền `192.168.137.35` |
+| Xe chạy nhưng không có số đo | Ngưỡng cảm biến sai; xe chưa kịp lăn đã bấm Dừng | Đọc log (mục 10.4); hiệu chuẩn (mục 10.2); ở PWM thấp chờ 1–3 s cho xe lăn |
+| Vận tốc nhảy lung tung (ví dụ 0,6 → 1,5 → 0,7 m/s) | Một vạch bị đếm hai lần do tín hiệu nhấp nháy ở mép băng keo; xe quá nhanh | Tăng vùng đệm, giảm tốc (mục 10.2, 10.3) |
+| Log báo "không thấy mặt sàn" liên tục | Xe đang bị nhấc lên; cảm biến lỏng dây | Đặt xe xuống bàn; kiểm tra dây A0 → GPIO34, VCC, GND |
+| Xe dừng giữa chừng | Mất Wi-Fi (xe tự dừng để an toàn) | Xem `stop_reason` trong `/status` hoặc dòng "Dừng xe" trong log; đặt điểm phát gần đường chạy |
+| Xe chạy hoài không dừng | Xe chỉ dừng khi bấm Dừng | Bấm **■ Dừng** trên Pi hoặc trang web của xe |
+| Bảng vận tốc chỉ cập nhật chậm (khoảng 0,3 s) | Gói UDP bị chặn | Laptop Windows: cho phép `electron.exe` qua tường lửa; vẫn dùng được nhờ cơ chế hỏi định kỳ |
+| Trên Pi có hai bản ứng dụng chạy cùng lúc | Mở lại ứng dụng qua SSH khi bản cũ chưa thoát | `pgrep -fa 'dist/electron \.'`, tắt bản cũ, hoặc khởi động lại Pi |
 | Ứng dụng không tự mở khi bật Pi | File autostart sai đường dẫn | Kiểm tra `~/.config/autostart/vat-ly-tuong-tac.desktop` |
 
 ---
 
 ## 13. Tình trạng hiện tại
 
-Tính đến ngày 24/11/2026:
+Tính đến ngày 26/11/2026:
 
 | Hạng mục | Trạng thái |
 |---|---|
 | Bài 1: dừng ở Hội chợ, câu hỏi không lặp, giọng đọc, màn kết quả | Đã chạy trên Pi |
 | Chế độ nhẹ, tối ưu Bài 1 và Bài 2 | Đã chạy trên Pi |
 | Tự khởi động, tắt Bluetooth và Raspberry Pi Connect | Đã áp dụng và kiểm tra sau khi khởi động lại |
-| Firmware xe đo vận tốc theo từng vạch | Đã viết và biên dịch, **chưa nạp vào ESP32** |
-| Bài 3 nhận số đo theo từng vạch (`main.js`, `preload.js`, `speed.js`) | Đã sửa và kiểm thử với xe giả lập trên máy tính, **chưa chép lên Pi** (cách chép: mục 9.3–9.5) |
-| Nguồn điện Pi | **Chưa thay**, vẫn báo thiếu điện áp |
+| Firmware xe: đo theo từng vạch, log qua Wi-Fi, gửi UDP, tăng tốc đều, chỉ dừng khi bấm Dừng | Đã nạp vào ESP32, chạy thử trên đường vạch: vận tốc tăng đều 0,375 → 0,435 → 0,476 m/s |
+| Ngưỡng cảm biến 85 ± 30, động cơ 60 → 160 trong 8 s | Đã lưu trong flash của xe và làm mặc định trong `robot_config.h` |
+| Bài 3: nhận UDP, hiển thị m/s theo từng vạch, IP mặc định, bàn phím số | Đã chép lên Pi (192.168.137.218) và mở lại ứng dụng; đã thử kết nối xe thật từ laptop. Chưa chạy thử xe thật từ Pi vì lúc cập nhật xe đang tắt |
+| Nguồn điện Pi | Từng báo thiếu điện áp kể từ lúc bật; nên dùng nguồn 5 V – 2,5 A chính hãng |
 | `robot_config.h` của xe | Không đưa lên Git (chứa mật khẩu Wi-Fi); mẫu cấu hình ở mục 3.3 |
-| Hướng dẫn trong ứng dụng của Bài 3 | Còn mô tả theo chế độ mô phỏng (km/h, mỗi giây một điểm), chưa nói về chế độ xe thật |
+| Hướng dẫn trong ứng dụng của Bài 3 | Đã cập nhật trong `src/renderer/app.js` cho cả chế độ mô phỏng và xe thật; **chưa chép file này lên Pi** (Pi đang tắt lúc cập nhật) |
 
 ---
 
@@ -699,6 +855,9 @@ Tính đến ngày 24/11/2026:
 | Δt | Khoảng thời gian giữa hai vạch |
 | v | Vận tốc (m/s) |
 | k | Bộ đếm mẫu cảm biến |
+| PWM₀, PWM₁ | PWM lúc bắt đầu, PWM tối đa của động cơ |
+| T | Thời gian tăng tốc từ PWM₀ lên PWM₁ |
+| seq, n | Số thứ tự số đo vận tốc; số thứ tự cuối cùng Pi đã nhận |
 | F, F₁, F₂ | Lực đo được, lực sau bộ lọc, lực gửi lên Pi |
 | s, d | Quãng đường, độ dịch chuyển |
 
