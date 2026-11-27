@@ -42,9 +42,35 @@ Thành phần chính:
 
 ## 2. Sơ đồ khối tổng quát
 
+<!-- cach-doc-so-do -->
+**Cách đọc các sơ đồ trong tài liệu.** Mỗi sơ đồ có phần *Giải thích cho học sinh* ngay bên dưới.
+
+- **Sơ đồ khối** (Hình 1, 2): mỗi hình chữ nhật là một bộ phận, mũi tên cho biết dữ liệu hoặc điện đi từ đâu tới đâu. Mũi tên hai đầu: dữ liệu đi cả hai chiều.
+- **Lưu đồ giải thuật** (Hình 3–9): đọc từ ô **BẮT ĐẦU**, đi theo mũi tên. Hình thoi là câu hỏi Đúng/Sai: đi theo nhánh **Đ** nếu đúng, nhánh **S** nếu sai. Hình bình hành là nhập hoặc xuất dữ liệu. Vòng tròn có chữ (A, B, C) là điểm nối: đi tiếp từ vòng tròn cùng chữ đang có mũi tên đi ra. Ký hiệu đầy đủ ở mục 14.1.
+<!-- /cach-doc-so-do -->
+
 ![Hình 1. Sơ đồ khối tổng quát của hệ thống](so-do/hinh-1-so-do-khoi-tong-quat.png)
 
 *Hình 1. Sơ đồ khối tổng quát của hệ thống*
+
+<!-- giai-thich:hardware -->
+**Giải thích cho học sinh.** Hãy hình dung thiết bị như một nhóm làm thí nghiệm, mỗi khối giữ một việc.
+
+1. **Khối xử lý trung tâm** (Raspberry Pi) là “bộ não”: nhận số liệu, tính toán, quyết định hiện gì lên màn hình.
+2. **Khối hiển thị** là nơi học sinh nhìn và chạm. Mũi tên HDMI đi từ Pi sang màn hình (hình ảnh), mũi tên USB đi ngược lại (thao tác chạm).
+3. **Khối âm thanh** chỉ nhận dữ liệu từ Pi nên mũi tên đi một chiều: Pi phát bài hát và giọng đọc ra loa.
+4. **Khối đo lực**: tay ấn vào cảm biến FSR402, vi điều khiển ESP32 (1) đổi tín hiệu điện thành số niutơn (N), rồi gửi cho Pi qua dây USB.
+5. **Khối xe đo vận tốc**: cảm biến dò line nhìn xuống sàn, ESP32 (2) phát hiện vạch đen, tính vận tốc và điều khiển hai động cơ qua mạch công suất L298N. Pin cấp điện riêng cho động cơ.
+6. **Khối truyền thông** (Wi-Fi) nối xe với Pi không cần dây. Mũi tên hai đầu nghĩa là dữ liệu đi cả hai chiều: Pi gửi lệnh Bắt đầu/Dừng, xe gửi số đo vận tốc.
+
+**Liên hệ Vật lý.** Thiết bị có hai “dụng cụ đo”: khối đo lực đo **lực** (đơn vị N), khối xe đo **thời gian** đi hết 10 cm để suy ra **vận tốc** (đơn vị m/s).
+
+**Thử trả lời.** Vì sao mũi tên giữa khối âm thanh và Pi chỉ có một chiều, còn giữa Pi và khối truyền thông có hai chiều?
+
+<details><summary>Xem đáp án</summary>Loa chỉ phát âm thanh, không gửi gì lại cho Pi. Còn Pi và xe vừa gửi lệnh, vừa nhận số đo nên cần hai chiều.</details>
+<!-- /giai-thich -->
+
+
 
 | Khối | Thành phần | Chức năng |
 |---|---|---|
@@ -87,12 +113,13 @@ Thông số xử lý:
 |---|---|---|
 | `SEND_INTERVAL_MS` | 200 ms | Chu kỳ gửi (5 lần/giây) |
 | `ADC_SAMPLES` | 16 | Số lần đọc ADC để lấy trung bình |
-| `ADC_ZERO`, `ADC_SATURATION` | 20, 4090 | Dải ADC quy đổi tuyến tính thành 0–60 N |
+| Thang đo | ADC 0–4095 ↔ 0–60 N | ADC 12 bit đọc từ 0 đến 4095, ứng thẳng với lực 0–60 N: F = ADC / 4095 × 60 |
+| `ADC_ZERO`, `ADC_SATURATION` | 20, 4090 | Hai đầu thang: ADC từ 20 trở xuống đọc là 0 N, từ 4090 trở lên đọc là 60 N |
 | `FILTER_ALPHA` | 0,30 | Hệ số bộ lọc EMA |
 | `UPDATE_DEADBAND_N` | 3 N | Chỉ cập nhật giá trị gửi khi lệch từ 3 N trở lên |
 | `OUTPUT_STEP_N` | 0,5 N | Bước làm tròn |
 
-FSR402 không phải cảm biến lực chính xác; quy đổi tuyến tính nhằm cho cảm giác điều khiển đều trên toàn dải. Có thể chỉnh `ADC_ZERO` và `ADC_SATURATION` theo từng cảm biến.
+Cách đọc lực: FSR402 đổi lực ấn thành điện áp, ESP32 đọc điện áp bằng ADC 12 bit được số từ 0 đến 4095. Thang 0–4095 ứng thẳng với thang lực 0–60 N, giống một thước đo có 4096 vạch chia đều: mỗi đơn vị ADC khoảng 0,015 N, ADC = 2048 là khoảng 30 N, ADC = 4095 là 60 N. `ADC_ZERO` và `ADC_SATURATION` là hai đầu của thang, có thể đặt theo từng cảm biến.
 
 ### 3.3. Xe đo vận tốc
 
@@ -352,6 +379,21 @@ teach-physics/
 
 *Hình 2. Sơ đồ khối phần mềm trên Raspberry Pi*
 
+<!-- giai-thich:software -->
+**Giải thích cho học sinh.** Phần mềm trên Pi chia ba lớp, giống một quán ăn có bếp, người phục vụ và bàn ăn.
+
+1. **Tiến trình chính** là “nhà bếp”: làm việc trực tiếp với thiết bị thật, gồm mở cửa sổ, đọc cảm biến lực qua cổng USB, nói chuyện với xe qua Wi-Fi (HTTP và UDP).
+2. **Lớp trung gian** là “người phục vụ”: chuyển dữ liệu giữa bếp và bàn ăn qua một cầu nối duy nhất. Giao diện không được tự vào bếp, nhờ vậy an toàn hơn.
+3. **Giao diện** là “bàn ăn”: trang chủ và ba bài học mà học sinh nhìn thấy. Từ trang chủ chọn Bài 1, 2 hoặc 3; Bài 1 lấy thêm hình ảnh, âm thanh trong thư mục tài nguyên.
+4. Đọc theo mũi tên: số đo từ cảm biến đi từ trên xuống (bếp → người phục vụ → bàn ăn). Lệnh của học sinh (bấm Bắt đầu) đi ngược lên, nên một số mũi tên có hai đầu.
+
+**Thử trả lời.** Khi học sinh bấm “Bắt đầu” ở Bài 3, lệnh đi qua những lớp nào để tới xe?
+
+<details><summary>Xem đáp án</summary>Giao diện (Bài 3) → lớp trung gian (cầu nối IPC) → tiến trình chính (giao tiếp HTTP) → xe ESP32 (2).</details>
+<!-- /giai-thich -->
+
+
+
 - **Tiến trình chính** (`main.js`, Node.js) giữ quyền truy cập phần cứng: mở cổng nối tiếp, gọi HTTP tới xe, tạo cửa sổ toàn màn hình trên Pi.
 - **Lớp trung gian** (`preload.js`) cung cấp đối tượng `window.physicsBridge`. Giao diện không chạy Node.js (`contextIsolation: true`, `nodeIntegration: false`).
 - **Giao diện** gồm trang chủ và các bài học. Mỗi bài là một mô-đun có hàm `mount()` trả về hàm dọn dẹp khi rời bài.
@@ -399,6 +441,24 @@ Kết thúc ván: trò chơi vẽ lại hành trình (đường xanh là quãng 
 
 *Hình 8. Lưu đồ một lượt chơi trong Bài 1*
 
+<!-- giai-thich:game -->
+**Giải thích cho học sinh.** Lưu đồ mô tả một lượt chơi của Bài 1: Khu vườn trên mây.
+
+1. Gieo xúc xắc được n bước. Nếu là lượt của máy (Robot), máy tự tìm đường ngắn nhất; nếu là học sinh, học sinh chọn hướng Bắc/Nam/Đông/Tây cho đủ n bước (hoặc dừng sớm khi chạm Hội chợ).
+2. Trước mỗi bước, kiểm tra ô tiếp theo: nếu là Hội chợ mà chưa đủ 3 loại quả thì bị chặn, chuyển lượt.
+3. Đi 1 ô thì **quãng đường s tăng thêm 1 m**.
+4. Gặp ô có quả chưa hái: trả lời câu hỏi Vật lý; trả lời đúng thì được bỏ quả vào giỏ.
+5. Tới Hội chợ với đủ 3 loại quả thì **thắng**, xem kết quả. Gặp chướng ngại (bùn, gai, hố) thì mất lượt. Còn bước thì đi tiếp (điểm nối B), hết bước thì chuyển lượt (điểm nối A).
+
+**Liên hệ Vật lý.** Cuối ván, trò chơi so sánh **quãng đường s** (tổng số mét đã đi, theo đường vòng) với **độ dịch chuyển d** (đoạn thẳng có hướng từ Hang Sóc tới Hội chợ). Luôn có s ≥ d, và **tốc độ trung bình s/t** luôn lớn hơn hoặc bằng **độ lớn vận tốc trung bình d/t**.
+
+**Thử trả lời.** Sóc đi 3 ô về Đông rồi 4 ô về Bắc. Quãng đường và độ dịch chuyển bằng bao nhiêu?
+
+<details><summary>Xem đáp án</summary>s = 3 + 4 = 7 m; d = √(3² + 4²) = 5 m, hướng Đông–Bắc.</details>
+<!-- /giai-thich -->
+
+
+
 ### 7.2. Bài 2: Lực ma sát
 
 Mô hình: vật có trọng lực P = 50 N, phản lực N = 50 N, lực ma sát nghỉ cực đại 30 N. Lực kéo lấy từ cảm biến FSR402 hoặc thanh trượt 0–60 N. Khi lực kéo lớn hơn 30 N, vật chuyển động, lực càng lớn xe chạy càng nhanh. Nút ẩn/hiện số liệu giúp học sinh tự dự đoán trước khi xem.
@@ -407,9 +467,45 @@ Mô hình: vật có trọng lực P = 50 N, phản lực N = 50 N, lực ma sá
 
 *Hình 6. Lưu đồ đo lực trên ESP32 (1)*
 
+<!-- giai-thich:force -->
+**Giải thích cho học sinh.** Đây là việc ESP32 (1) làm mỗi 0,2 giây: đọc cảm biến lực và gửi số niutơn cho Pi.
+
+1. Cảm biến FSR402 đổi lực ấn thành điện áp. ESP32 đọc điện áp bằng bộ chuyển đổi **ADC 12 bit**, cho ra một số nguyên từ **0 đến 4095**. Tay càng ấn mạnh, số ADC càng lớn.
+2. Đọc **16 lần rồi lấy trung bình**, giống đo nhiều lần rồi lấy trung bình trong giờ thực hành.
+3. Thang ADC **0–4095** ứng với thang lực **0–60 N** theo đường thẳng: **F = ADC / 4095 × 60**. ADC = 0 là 0 N, ADC = 4095 là 60 N, mỗi đơn vị ADC bằng khoảng 0,015 N. Ví dụ ADC = 2048 thì F ≈ 30 N.
+4. **Làm mượt:** F₁ = F₁ + 0,3 × (F − F₁). Số đo mới chỉ “kéo” F₁ đi 30% về phía nó, nên số trên màn hình chuyển đều khi tay hơi run. Khi tay thả ra (F = 0), F₁ về 0 ngay.
+5. Số gửi đi (F₂) đổi khi lực thay đổi **từ 3 N trở lên**, làm tròn tới 0,5 N. Gửi cho Pi qua dây USB dạng `value:30.00N`, rồi quay lại chờ chu kỳ tiếp theo (vòng tròn A).
+
+**Liên hệ Vật lý.** Đơn vị lực là **niutơn (N)**. Lực F tỉ lệ thuận với số ADC: số ADC tăng gấp đôi thì lực tăng gấp đôi. Đây giống như đọc một thước đo có 4096 vạch chia, trải đều từ 0 đến 60 N.
+
+**Thử trả lời.** Cảm biến đọc được ADC = 1365. Lực bằng bao nhiêu niutơn?
+
+<details><summary>Xem đáp án</summary>F = 1365 / 4095 × 60 = 20 N.</details>
+<!-- /giai-thich -->
+
+
+
 ![Hình 7. Lưu đồ xử lý dữ liệu lực trong Bài 2](so-do/hinh-7-luu-do-bai-2-luc-ma-sat.png)
 
 *Hình 7. Lưu đồ xử lý dữ liệu lực trong Bài 2*
+
+<!-- giai-thich:forceLesson -->
+**Giải thích cho học sinh.** Bài 2 so sánh lực kéo với lực ma sát nghỉ cực đại để biết vật đứng yên hay chuyển động.
+
+1. Pi nhận một dòng dữ liệu từ cảm biến lực và tách ra con số F (N).
+2. So sánh: **F có lớn hơn 30 N không?** 30 N là lực ma sát nghỉ cực đại của vật trong bài.
+3. Nếu **có**: lực kéo thắng ma sát, vật **chuyển động**; lực càng lớn, vật chạy càng nhanh.
+4. Nếu **không**: lực ma sát nghỉ cân bằng với lực kéo, vật **đứng yên**.
+5. Vòng tròn A: lặp lại với dòng dữ liệu tiếp theo (5 lần mỗi giây).
+
+**Liên hệ Vật lý.** Lực ma sát nghỉ luôn bằng lực kéo khi vật đứng yên, nhưng không thể vượt quá giá trị cực đại (ở đây 30 N). Khi lực kéo lớn hơn giá trị này, vật bắt đầu trượt.
+
+**Thử trả lời.** Kéo vật bằng lực 25 N thì lực ma sát nghỉ lúc đó bằng bao nhiêu?
+
+<details><summary>Xem đáp án</summary>25 N, vì vật đứng yên nên ma sát nghỉ cân bằng đúng với lực kéo.</details>
+<!-- /giai-thich -->
+
+
 
 ### 7.3. Bài 3: Vận tốc
 
@@ -439,6 +535,25 @@ Vận tốc tăng đều qua từng vạch, phù hợp với chuyển động nh
 
 *Hình 3. Lưu đồ tác vụ đọc cảm biến dò line*
 
+<!-- giai-thich:sensorTask -->
+**Giải thích cho học sinh.** Đây là việc ESP32 trên xe làm lặp đi lặp lại **1 000 lần mỗi giây**: nhìn xuống sàn và quyết định đang ở trên vạch đen hay mặt bàn.
+
+1. Mỗi 1 ms, đọc một giá trị ADC từ cảm biến. Băng đen phản xạ ít ánh sáng hồng ngoại nên cho số lớn (khoảng 145–191); mặt bàn sáng cho số nhỏ (khoảng 16–30). Số quá lớn (trên 1 500) nghĩa là xe bị nhấc lên, không tính.
+2. **Nhánh trái (đang ở mặt bàn):** gặp mẫu đen thì đếm k. Phải **đen 3 lần liên tiếp** mới tin là vạch thật, để không bị lừa bởi một hạt bụi hay vết bẩn. Thời điểm của mẫu đen **đầu tiên** được ghi lại là t₀.
+3. Khi đã chắc chắn là vạch: tăng số vạch N lên 1. Nếu đây là **vạch đầu tiên**, chỉ bấm “đồng hồ bấm giờ”. Từ **vạch thứ hai**, tính Δt = t₀ − t₁ (thời gian đi giữa hai vạch) và v = 0,1 / Δt.
+4. Lưu số đo, rồi lấy t₀ làm mốc t₁ cho vạch sau.
+5. **Nhánh phải (đang ở trên vạch):** phải thấy **trắng 5 lần liên tiếp** mới coi là đã ra khỏi vạch. Nhờ vậy một vạch không bị đếm hai lần.
+6. Vòng tròn **A** nghĩa là quay lại bước “Chờ chu kỳ 1 ms” để đọc mẫu tiếp theo.
+
+**Liên hệ Vật lý.** Đây chính là cách đo vận tốc trung bình **v = s / t** với s = 0,1 m cố định. Ví dụ xe qua vạch 3 lúc 1,086 s và vạch 4 lúc 1,296 s: Δt = 0,210 s, v = 0,1 / 0,210 ≈ 0,48 m/s. Vì đoạn 10 cm rất ngắn, số đo này gần bằng vận tốc tức thời của xe tại vạch.
+
+**Thử trả lời.** Nếu xe qua hai vạch liên tiếp cách nhau 0,25 s thì vận tốc là bao nhiêu?
+
+<details><summary>Xem đáp án</summary>v = 0,1 m / 0,25 s = 0,4 m/s.</details>
+<!-- /giai-thich -->
+
+
+
 Tác vụ này chạy riêng mỗi 1 ms với mức ưu tiên cao hơn web server, nên việc Pi hỏi dữ liệu không làm lệch thời điểm qua vạch. Mỗi mẫu ADC được phân loại:
 
 | Điều kiện | Kết quả |
@@ -454,11 +569,49 @@ Một vạch được xác nhận khi đọc 3 mẫu đen liên tiếp; xe ra kh
 
 *Hình 4. Lưu đồ chương trình chính của xe*
 
+<!-- giai-thich:carLoop -->
+**Giải thích cho học sinh.** Trong khi tác vụ ở Hình 3 lo đọc cảm biến, chương trình chính của xe lo **nghe lệnh, điều khiển động cơ và báo kết quả**.
+
+1. Khi bật nguồn: chuẩn bị các chân điều khiển, đọc cấu hình đã lưu (ngưỡng cảm biến, tốc độ), kết nối Wi-Fi rồi khởi động tác vụ đọc cảm biến (khung có hai vạch đứng là một chương trình con chạy song song).
+2. Vòng lặp chính bắt đầu ở “Nhận lệnh HTTP”: nghe xem Pi có bấm Bắt đầu, Dừng hay Đặt lại không.
+3. **Mất Wi-Fi?** Nếu mất thì dừng động cơ ngay, vì lúc đó Pi không thể gửi lệnh Dừng nữa. Đây là quy tắc an toàn.
+4. **Xe đang chạy?** Nếu đang chạy, tính lại PWM (mức điện cấp cho động cơ) theo công thức PWM = PWM₀ + (PWM₁ − PWM₀) × t / T: PWM tăng **đều đặn** theo thời gian, từ 60 lên 160 trong 8 giây.
+5. **Có số đo vận tốc mới?** Nếu tác vụ cảm biến vừa đo xong một vạch, gửi ngay cho Pi qua UDP và ghi vào nhật ký (log).
+6. Vòng tròn **A** đưa về đầu vòng lặp. Xe chỉ dừng khi nhận lệnh Dừng (hoặc mất Wi-Fi).
+
+**Liên hệ Vật lý.** PWM tăng đều làm lực kéo của động cơ tăng dần, nên xe **chạy chậm rồi nhanh dần**. Học sinh quan sát được điều này trong bảng: vận tốc tại các vạch sau lớn hơn vạch trước (ví dụ 0,375 → 0,435 → 0,476 m/s).
+
+**Thử trả lời.** Vì sao xe phải tự dừng khi mất Wi-Fi, trong khi bình thường chỉ dừng khi bấm nút?
+
+<details><summary>Xem đáp án</summary>Vì mất Wi-Fi thì lệnh Dừng từ Pi không tới được xe; nếu không tự dừng, xe sẽ chạy mãi và có thể rơi khỏi bàn.</details>
+<!-- /giai-thich -->
+
+
+
 Trong công thức của Hình 4: PWM₀ là PWM lúc bắt đầu (60), PWM₁ là PWM tối đa (160), T là thời gian tăng tốc (8 s), t là thời gian từ lúc bấm Bắt đầu.
 
 ![Hình 5. Lưu đồ nhận số đo vận tốc trên Raspberry Pi](so-do/hinh-5-luu-do-bai-3-nhan-so-do-van-toc.png)
 
 *Hình 5. Lưu đồ nhận số đo vận tốc trên Raspberry Pi*
+
+<!-- giai-thich:speedLesson -->
+**Giải thích cho học sinh.** Đây là việc ứng dụng trên Pi làm ở Bài 3 để nhận số đo từ xe và hiện lên bảng.
+
+1. Chọn IP của xe (đã điền sẵn 192.168.137.35) và kết nối. Pi hỏi trạng thái xe và **đăng ký nhận tin nhanh** qua UDP.
+2. Nếu xe không trả lời đúng, báo lỗi và quay lại cho nhập IP. Nếu đúng, ghi nhớ số thứ tự n của số đo mới nhất.
+3. Bấm **Bắt đầu**: Pi gửi lệnh cho xe chạy.
+4. Pi chờ: hoặc xe gửi tin nhanh (gói UDP) khi vừa qua vạch, hoặc hết 300 ms.
+5. Mỗi số đo có **số thứ tự** như số trang sách. Nếu gói vừa nhận đúng là số n + 1 (số tiếp theo), thêm ngay vào bảng. Nếu không có gói, hoặc bị nhảy số (mất một gói), Pi hỏi lại xe “cho tôi các số đo sau số n” để lấy bù.
+6. Thêm dòng vào bảng và đồ thị v(t), cập nhật n. Lặp lại tới khi xe dừng.
+
+**Liên hệ Vật lý.** Mỗi dòng của bảng là một điểm trên **đồ thị vận tốc theo thời gian v(t)**. Nếu các điểm nằm gần một đường thẳng đi lên, xe đang chuyển động **nhanh dần đều**.
+
+**Thử trả lời.** Pi đã có số đo số 6, rồi nhận được gói số 8. Pi làm gì?
+
+<details><summary>Xem đáp án</summary>Gói số 8 không liền sau số 6 (thiếu số 7), nên Pi bỏ qua gói đó và hỏi xe các số đo sau số 6; xe gửi lại cả số 7 và số 8.</details>
+<!-- /giai-thich -->
+
+
 
 ---
 
@@ -467,6 +620,22 @@ Trong công thức của Hình 4: PWM₀ là PWM lúc bắt đầu (60), PWM₁ 
 ![Hình 9. Lưu đồ khởi động hệ thống](so-do/hinh-9-luu-do-khoi-dong-he-thong.png)
 
 *Hình 9. Lưu đồ khởi động hệ thống*
+
+<!-- giai-thich:boot -->
+**Giải thích cho học sinh.** Lưu đồ cho biết điều gì xảy ra từ lúc cắm điện cho tới khi màn hình hiện bài học, không cần bàn phím hay chuột.
+
+1. Bật nguồn, Raspberry Pi OS khởi động và **tự đăng nhập**.
+2. Ứng dụng tự chạy. Nếu thiết bị là Raspberry Pi, bật chế độ đồ họa rút gọn để chạy mượt hơn.
+3. Trang chủ hiện ra với các bài học.
+4. Ứng dụng thử mở cổng của cảm biến lực. Chưa được (chưa cắm cảm biến) thì chờ 3 giây rồi thử lại, cứ thế cho tới khi kết nối được.
+5. Kết nối xong thì bắt đầu nhận dữ liệu lực cho Bài 2.
+
+**Thử trả lời.** Nếu cắm cảm biến lực sau khi ứng dụng đã mở 1 phút, ứng dụng có nhận được không?
+
+<details><summary>Xem đáp án</summary>Có. Ứng dụng thử kết nối lại mỗi 3 giây, nên sẽ tự nhận khi cảm biến được cắm vào.</details>
+<!-- /giai-thich -->
+
+
 
 Khi cấp nguồn:
 
